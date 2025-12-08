@@ -1,0 +1,53 @@
+// Copyright Amir Ben-Kiki 2025
+
+#pragma once
+
+#include "CoreMinimal.h"
+#include "MidiNotesData.generated.h"
+
+// This struct links note-on and note-off events
+USTRUCT(BlueprintType)
+struct FLinkedMidiNote
+{
+    GENERATED_BODY()
+
+    UPROPERTY()
+    int32 NoteOnTick = 0;
+
+    UPROPERTY()
+    int32 NoteOffTick = 0;
+
+    UPROPERTY()
+    int8 Velocity = 0;
+
+    UPROPERTY()
+    int8 NoteNumber = 0;
+
+
+};
+
+USTRUCT(BlueprintType)
+struct FMidiNotesTrack
+{
+    GENERATED_BODY()
+
+    UPROPERTY()
+    TArray<FLinkedMidiNote> Notes;
+
+    UPROPERTY()
+    FString TrackName;
+
+    UPROPERTY()
+    int32 TrackIndex = INDEX_NONE;
+};
+
+USTRUCT(BlueprintType)
+struct MIDIEXTENSIONS_API FMidiNotesData
+{
+    GENERATED_BODY()
+
+    UPROPERTY()
+    TArray<FMidiNotesTrack> Tracks;
+
+	static TSharedPtr<FMidiNotesData> BuildFromMidiFile(class UMidiFile* MidiFile);
+};
