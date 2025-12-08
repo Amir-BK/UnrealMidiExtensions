@@ -12,7 +12,7 @@
  * 
  */
 UCLASS(BlueprintType)
-class MIDIWIDGETS_API UMidiPianoroll : public UUserWidget
+class MIDIWIDGETS_API UMidiPianoroll : public UWidget
 {
 	GENERATED_BODY()
 	
