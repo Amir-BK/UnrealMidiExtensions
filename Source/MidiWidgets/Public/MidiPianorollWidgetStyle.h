@@ -19,12 +19,24 @@ struct MIDIWIDGETS_API FMidiTrackVisualizationData
 		: bIsVisible(true)
 		, TrackColor(FLinearColor::White)
 	{}
+
 	/** Whether this track is visible in the pianoroll */
 	UPROPERTY(EditAnywhere, Category = "Appearance")
 	bool bIsVisible;
+
 	/** The color to use when rendering notes for this track */
 	UPROPERTY(EditAnywhere, Category = "Appearance")
 	FLinearColor TrackColor;
+
+	bool operator==(const FMidiTrackVisualizationData& Other) const
+	{
+		return bIsVisible == Other.bIsVisible && TrackColor == Other.TrackColor;
+	}
+
+	bool operator!=(const FMidiTrackVisualizationData& Other) const
+	{
+		return !(*this == Other);
+	}
 };
 
 USTRUCT()
@@ -37,6 +49,15 @@ struct MIDIWIDGETS_API FMidiFileVisualizationData
 
 	static FMidiFileVisualizationData BuildFromMidiFile(UMidiFile* MidiFile);
 
+	bool operator==(const FMidiFileVisualizationData& Other) const
+	{
+		return TrackVisualizations == Other.TrackVisualizations;
+	}
+
+	bool operator!=(const FMidiFileVisualizationData& Other) const
+	{
+		return !(*this == Other);
+	}
 };
 
 /**

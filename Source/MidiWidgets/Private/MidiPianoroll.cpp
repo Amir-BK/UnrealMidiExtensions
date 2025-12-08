@@ -13,12 +13,13 @@ TSharedRef<SWidget> UMidiPianoroll::RebuildWidget()
     {
         MidiData = FMidiNotesData::BuildFromMidiFile(LinkedMidiFile);
         SongsMap = MakeShared<FSongMaps, ESPMode::ThreadSafe>(*LinkedMidiFile->GetSongMaps());
+        VisualizationData = FMidiFileVisualizationData::BuildFromMidiFile(LinkedMidiFile);
     }
 
     SAssignNew(PianorollWidget, SMidiPianoroll)
         .LinkedMidiData(MidiData)
         .LinkedSongsMap(SongsMap)
-        .VisualizationData(MakeShared<FMidiFileVisualizationData, ESPMode::ThreadSafe>(VisualizationData))
+        .VisualizationData(VisualizationData)
         .PianorollStyle(&FMidiPianorollStyle::GetDefault())
         .Offset(FVector2D::ZeroVector)
         .Zoom(FVector2D(1.0f, 1.0f));

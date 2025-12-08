@@ -11,11 +11,13 @@ void SMidiPianoroll::PrivateRegisterAttributes(FSlateAttributeInitializer& Attri
 {
 	SLATE_ADD_MEMBER_ATTRIBUTE_DEFINITION_WITH_NAME(AttributeInitializer, "Offset", Offset, EInvalidateWidgetReason::Paint);
 	SLATE_ADD_MEMBER_ATTRIBUTE_DEFINITION_WITH_NAME(AttributeInitializer, "Zoom", Zoom, EInvalidateWidgetReason::Paint);
+	SLATE_ADD_MEMBER_ATTRIBUTE_DEFINITION_WITH_NAME(AttributeInitializer, "VisualizationData", VisualizationData, EInvalidateWidgetReason::Paint);
 }
 
 SMidiPianoroll::SMidiPianoroll()
 	: Offset(*this, FVector2D::ZeroVector)
 	, Zoom(*this, FVector2D(1.0f, 1.0f))
+	, VisualizationData(*this, FMidiFileVisualizationData())
 {
 }
 
@@ -31,11 +33,11 @@ void SMidiPianoroll::Construct(const FArguments& InArgs)
 
 	LinkedMidiData = InArgs._LinkedMidiData;
 	LinkedSongsMap = InArgs._LinkedSongsMap;
-	VisualizationData = InArgs._VisualizationData;
 	PianorollStyle = InArgs._PianorollStyle ? InArgs._PianorollStyle : &FMidiPianorollStyle::GetDefault();
 
 	Offset.Assign(*this, InArgs._Offset);
 	Zoom.Assign(*this, InArgs._Zoom);
+	VisualizationData.Assign(*this, InArgs._VisualizationData);
 
 	ChildSlot
 	[
@@ -66,9 +68,9 @@ int32 SMidiPianoroll::OnPaint(const FPaintArgs& Args, const FGeometry& AllottedG
             const FMidiNotesTrack& Track = LinkedMidiData->Tracks[TrackIdx];
             // Track color from visualization data if available
             FLinearColor TrackColor = FLinearColor::White;
-            if (VisualizationData.IsValid() && VisualizationData->TrackVisualizations.IsValidIndex(TrackIdx))
+            if (VisualizationData.Get().TrackVisualizations.IsValidIndex(TrackIdx))
             {
-                const FMidiTrackVisualizationData& Vis = VisualizationData->TrackVisualizations[TrackIdx];
+                const FMidiTrackVisualizationData& Vis = VisualizationData.Get().TrackVisualizations[TrackIdx];
                 if (!Vis.bIsVisible) { continue; }
                 TrackColor = Vis.TrackColor;
             }

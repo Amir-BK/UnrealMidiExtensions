@@ -23,7 +23,7 @@ public:
         /** The MIDI data to visualize */
         SLATE_ARGUMENT(TSharedPtr<FMidiNotesData>, LinkedMidiData)
         /** The visualization data for the MIDI file */
-        SLATE_ARGUMENT(TSharedPtr<FMidiFileVisualizationData>, VisualizationData)
+        SLATE_ATTRIBUTE(FMidiFileVisualizationData, VisualizationData)
         /** The song maps associated with the MIDI file */
         SLATE_ARGUMENT(TSharedPtr<FSongMaps>, LinkedSongsMap)
         /** The style set for this widget */
@@ -49,7 +49,7 @@ protected:
 
 	TSharedPtr<FSongMaps, ESPMode::ThreadSafe> LinkedSongsMap;
 
-	TSharedPtr<FMidiFileVisualizationData, ESPMode::ThreadSafe> VisualizationData;
+	TSlateAttribute<FMidiFileVisualizationData> VisualizationData;
 
 
 	TSlateAttribute<FVector2D> Offset;
