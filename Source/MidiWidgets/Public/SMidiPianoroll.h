@@ -18,12 +18,12 @@ class MIDIWIDGETS_API SMidiPianoroll : public SCompoundWidget
 	SLATE_DECLARE_WIDGET(SMidiPianoroll, SCompoundWidget)
 
 public:
-	SLATE_BEGIN_ARGS(SMidiPianoroll)
+    SLATE_BEGIN_ARGS(SMidiPianoroll)
 	{}
-        /** The MIDI data to visualize */
-        SLATE_ARGUMENT(TSharedPtr<FMidiNotesData>, LinkedMidiData)
-        /** The visualization data for the MIDI file */
-        SLATE_ATTRIBUTE(FMidiFileVisualizationData, VisualizationData)
+           /** The MIDI data to visualize */
+           SLATE_ARGUMENT(TSharedPtr<FMidiNotesData>, LinkedMidiData)
+           /** The visualization data for the MIDI file - use ATTRIBUTE for live binding */
+           SLATE_ATTRIBUTE(FMidiFileVisualizationData, VisualizationData)
         /** The song maps associated with the MIDI file */
         SLATE_ARGUMENT(TSharedPtr<FSongMaps>, LinkedSongsMap)
         /** The style set for this widget */
@@ -45,11 +45,12 @@ public:
 	
 
 protected:
-	TSharedPtr<FMidiNotesData, ESPMode::ThreadSafe> LinkedMidiData;
+TSharedPtr<FMidiNotesData, ESPMode::ThreadSafe> LinkedMidiData;
 
-	TSharedPtr<FSongMaps, ESPMode::ThreadSafe> LinkedSongsMap;
+TSharedPtr<FSongMaps, ESPMode::ThreadSafe> LinkedSongsMap;
 
-	TSlateAttribute<FMidiFileVisualizationData> VisualizationData;
+// Changed from TSharedPtr to TSlateAttribute for live binding
+TSlateAttribute<FMidiFileVisualizationData> VisualizationData;
 
 
 	TSlateAttribute<FVector2D> Offset;

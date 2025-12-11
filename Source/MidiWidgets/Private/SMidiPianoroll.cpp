@@ -63,14 +63,16 @@ int32 SMidiPianoroll::OnPaint(const FPaintArgs& Args, const FGeometry& AllottedG
 
     if(LinkedMidiData.IsValid())
     {
+        const FMidiFileVisualizationData& VisData = VisualizationData.Get();
+        
         for (int32 TrackIdx = 0; TrackIdx < LinkedMidiData->Tracks.Num(); ++TrackIdx)
         {
             const FMidiNotesTrack& Track = LinkedMidiData->Tracks[TrackIdx];
             // Track color from visualization data if available
             FLinearColor TrackColor = FLinearColor::White;
-            if (VisualizationData.Get().TrackVisualizations.IsValidIndex(TrackIdx))
+            if (VisData.TrackVisualizations.IsValidIndex(TrackIdx))
             {
-                const FMidiTrackVisualizationData& Vis = VisualizationData.Get().TrackVisualizations[TrackIdx];
+                const FMidiTrackVisualizationData& Vis = VisData.TrackVisualizations[TrackIdx];
                 if (!Vis.bIsVisible) { continue; }
                 TrackColor = Vis.TrackColor;
             }

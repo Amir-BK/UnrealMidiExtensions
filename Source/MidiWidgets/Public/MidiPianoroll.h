@@ -23,6 +23,9 @@ public:
 	UPROPERTY(EditAnywhere, Category = "MIDI")
 	FMidiFileVisualizationData VisualizationData;
 
+	// Getter for attribute binding
+	FMidiFileVisualizationData GetVisualizationData() const { return VisualizationData; }
+
 	TSharedRef<SWidget> RebuildWidget() override;
 
 	void ReleaseSlateResources(bool bReleaseChildren) override;
