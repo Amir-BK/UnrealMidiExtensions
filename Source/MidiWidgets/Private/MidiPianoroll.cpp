@@ -34,3 +34,17 @@ void UMidiPianoroll::ReleaseSlateResources(bool bReleaseChildren)
 
     PianorollWidget.Reset();
 }
+
+void UMidiPianoroll::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
+{
+    Super::PostEditChangeProperty(PropertyChangedEvent);
+   
+	if(PropertyChangedEvent.GetPropertyName() == GET_MEMBER_NAME_CHECKED(UMidiPianoroll, LinkedMidiFile))
+    {
+		if (PianorollWidget.IsValid())
+		{
+			PianorollWidget->SetMidiData(FMidiNotesData::BuildFromMidiFile(LinkedMidiFile));
+			VisualizationData = FMidiFileVisualizationData::BuildFromMidiFile(LinkedMidiFile);
+		}
+	}
+}

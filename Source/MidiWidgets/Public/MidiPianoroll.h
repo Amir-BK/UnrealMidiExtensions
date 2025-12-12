@@ -33,6 +33,10 @@ public:
 
 	void ReleaseSlateResources(bool bReleaseChildren) override;
 
+#if WITH_EDITOR
+	void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
+#endif
+
 private:
 	TSharedPtr<SMidiPianoroll> PianorollWidget;
 };

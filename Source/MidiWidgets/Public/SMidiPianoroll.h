@@ -64,6 +64,11 @@ public:
 
 	TOptional<EMouseCursor::Type> GetCursor() const override;
 
+    void SetMidiData(TSharedPtr<FMidiNotesData, ESPMode::ThreadSafe> InMidiData)
+    {
+        LinkedMidiData = InMidiData;
+	}
+
 
 private:
 	bool bIsPanning = false;
