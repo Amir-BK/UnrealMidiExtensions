@@ -17,7 +17,7 @@ class MIDIWIDGETS_API UMidiPianoroll : public UWidget
 	GENERATED_BODY()
 	
 public:
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MIDI")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MIDI", BlueprintSetter = SetMidiFile)
 	class UMidiFile* LinkedMidiFile;
 
 	UPROPERTY(EditAnywhere, Category = "MIDI")
@@ -25,6 +25,9 @@ public:
 
 	UPROPERTY(EditAnywhere, Category = "Appearance")
 	FMidiPianorollStyle PianorollStyle;
+
+	UFUNCTION(BlueprintSetter)
+	void SetMidiFile(UMidiFile* InMidiFile);
 
 	// Getter for attribute binding
 	const FMidiFileVisualizationData& GetVisualizationData() { return VisualizationData; }

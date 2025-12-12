@@ -4,6 +4,17 @@
 #include "HarmonixMidi/MidiFile.h"
 #include "MidiFile/MidiNotesData.h"
 
+
+void UMidiPianoroll::SetMidiFile(UMidiFile* InMidiFile)
+{
+    LinkedMidiFile = InMidiFile;
+    if (PianorollWidget.IsValid())
+    {
+        PianorollWidget->SetMidiData(FMidiNotesData::BuildFromMidiFile(LinkedMidiFile));
+        VisualizationData = FMidiFileVisualizationData::BuildFromMidiFile(LinkedMidiFile);
+    }
+}
+
 TSharedRef<SWidget> UMidiPianoroll::RebuildWidget()
 {
     TSharedPtr<FMidiNotesData, ESPMode::ThreadSafe> MidiData;
@@ -41,10 +52,6 @@ void UMidiPianoroll::PostEditChangeProperty(FPropertyChangedEvent& PropertyChang
    
 	if(PropertyChangedEvent.GetPropertyName() == GET_MEMBER_NAME_CHECKED(UMidiPianoroll, LinkedMidiFile))
     {
-		if (PianorollWidget.IsValid())
-		{
-			PianorollWidget->SetMidiData(FMidiNotesData::BuildFromMidiFile(LinkedMidiFile));
-			VisualizationData = FMidiFileVisualizationData::BuildFromMidiFile(LinkedMidiFile);
-		}
+		SetMidiFile(LinkedMidiFile);
 	}
 }
