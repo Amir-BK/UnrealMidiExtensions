@@ -9,6 +9,7 @@
 #include "HarmonixMidi/MidiFile.h"
 #include "HarmonixMidi/SongMaps.h"
 #include "MidiPianorollWidgetStyle.h"
+#include "Misc/Optional.h"
 
 /**
  * 
@@ -56,4 +57,15 @@ TSlateAttribute<FMidiFileVisualizationData> VisualizationData;
 	TSlateAttribute<FVector2D> Offset;
 
 	TSlateAttribute<FVector2D> Zoom;
+
+public:
+	//SWidget interface
+    virtual FReply OnMouseMove(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override;
+
+	TOptional<EMouseCursor::Type> GetCursor() const override;
+
+
+private:
+	bool bIsPanning = false;
+	bool bIsRightMouseButtonDown = false;
 };

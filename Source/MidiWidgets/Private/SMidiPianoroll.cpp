@@ -6,6 +6,15 @@
 #include "Rendering/DrawElements.h"
 #include "Styling/CoreStyle.h"
 
+
+namespace
+{
+    constexpr bool IsAccidentalNote(int32 NoteNumber)
+    {
+        return NoteNumber % 12 == 1 || NoteNumber % 12 == 3 || NoteNumber % 12 == 6 || NoteNumber % 12 == 8 || NoteNumber % 12 == 10;
+    }
+};
+
 SLATE_IMPLEMENT_WIDGET(SMidiPianoroll)
 void SMidiPianoroll::PrivateRegisterAttributes(FSlateAttributeInitializer& AttributeInitializer)
 {
@@ -46,20 +55,57 @@ void SMidiPianoroll::Construct(const FArguments& InArgs)
 }
 int32 SMidiPianoroll::OnPaint(const FPaintArgs& Args, const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements, int32 LayerId, const FWidgetStyle& InWidgetStyle, bool bParentEnabled) const
 {
-    const FSlateBrush* Brush = FCoreStyle::Get().GetBrush("WhiteBrush");
+    const FSlateBrush* Brush = &PianorollStyle->NoteBrush;
 
     const FVector2D LocalSize = AllottedGeometry.GetLocalSize();
     const FVector2D LocalOffset = Offset.Get();
     const FVector2D LocalZoom = Zoom.Get();
 
     // Background
-    FSlateDrawElement::MakeBox(
-        OutDrawElements,
-        LayerId++,
-        AllottedGeometry.ToPaintGeometry(LocalSize, FSlateLayoutTransform()),
-        Brush,
-        ESlateDrawEffect::None,
-        FLinearColor(0.05f, 0.05f, 0.05f, 1.0f));
+
+	const FLinearColor& GridColor = PianorollStyle->GridColor;
+	const FLinearColor& AccidentalGridColor = PianorollStyle->AccidentalGridColor;
+
+    // Draw piano grid
+    LayerId++;
+    {
+        const float RowH = 10.0f * LocalZoom.Y;
+        
+        for (int i = 0; i < 128; i++)
+        {
+            const float Y = (127 - i) * (RowH + 2.0f) - LocalOffset.Y;
+            if (IsAccidentalNote(i))
+            {
+                FSlateDrawElement::MakeBox(
+                    OutDrawElements,
+                    LayerId,
+                    AllottedGeometry.ToPaintGeometry(
+                        FVector2D(LocalSize.X, RowH),
+                        FSlateLayoutTransform(FVector2D(0.0f, Y))
+                    ),
+                    Brush,
+                    ESlateDrawEffect::None,
+					AccidentalGridColor);
+
+            }
+            else {
+                FSlateDrawElement::MakeBox(
+                    OutDrawElements,
+                    LayerId,
+                    AllottedGeometry.ToPaintGeometry(
+                        FVector2D(LocalSize.X, RowH),
+                        FSlateLayoutTransform(FVector2D(0.0f, Y))
+                    ),
+                    Brush,
+					ESlateDrawEffect::None,
+                    GridColor);
+
+            }
+        }
+
+    }
+   
+
 
     if(LinkedMidiData.IsValid())
     {
@@ -101,5 +147,43 @@ int32 SMidiPianoroll::OnPaint(const FPaintArgs& Args, const FGeometry& AllottedG
     }
 
     return LayerId;
+}
+FReply SMidiPianoroll::OnMouseMove(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent)
+{
+    if (MouseEvent.IsMouseButtonDown(EKeys::RightMouseButton))
+    {
+        const FVector2D CurrentPos = Offset.Get();
+        const FVector2D Delta = MouseEvent.GetCursorDelta();
+        if(!Delta.IsNearlyZero())
+        {
+            Offset.Set(*this, CurrentPos - Delta / Zoom.Get());
+			bIsPanning = true;
+            return FReply::Handled();
+        }
+        else {
+			bIsPanning = false;
+        }
+		bIsRightMouseButtonDown = true;
+ 
+    }
+    else {
+		bIsPanning = false;
+		bIsRightMouseButtonDown = false;
+    }
+    
+    return FReply::Unhandled();
+}
+TOptional<EMouseCursor::Type> SMidiPianoroll::GetCursor() const
+{
+    if (bIsRightMouseButtonDown)
+    {
+        if (bIsPanning)
+        {
+            return EMouseCursor::GrabHandClosed;
+        }
+		return EMouseCursor::GrabHand;
+    }
+
+	return EMouseCursor::Default;
 }
 END_SLATE_FUNCTION_BUILD_OPTIMIZATION

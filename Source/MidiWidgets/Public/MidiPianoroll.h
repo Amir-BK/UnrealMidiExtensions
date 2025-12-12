@@ -23,8 +23,11 @@ public:
 	UPROPERTY(EditAnywhere, Category = "MIDI")
 	FMidiFileVisualizationData VisualizationData;
 
+	UPROPERTY(EditAnywhere, Category = "Appearance")
+	FMidiPianorollStyle PianorollStyle;
+
 	// Getter for attribute binding
-	FMidiFileVisualizationData GetVisualizationData() const { return VisualizationData; }
+	const FMidiFileVisualizationData& GetVisualizationData() { return VisualizationData; }
 
 	TSharedRef<SWidget> RebuildWidget() override;
 

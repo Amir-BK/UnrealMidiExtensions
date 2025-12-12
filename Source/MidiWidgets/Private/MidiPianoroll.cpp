@@ -21,7 +21,7 @@ TSharedRef<SWidget> UMidiPianoroll::RebuildWidget()
         .LinkedSongsMap(SongsMap)
         // Bind to getter using lambda - will be called each frame during paint
         .VisualizationData(TAttribute<FMidiFileVisualizationData>::CreateLambda([this]() { return GetVisualizationData(); }))
-        .PianorollStyle(&FMidiPianorollStyle::GetDefault())
+        .PianorollStyle(&PianorollStyle)
         .Offset(FVector2D::ZeroVector)
         .Zoom(FVector2D(1.0f, 1.0f));
 

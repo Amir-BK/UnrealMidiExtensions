@@ -3,9 +3,11 @@
 
 #include "MidiPianorollWidgetStyle.h"
 #include "HarmonixMidi/MidiFile.h"
+#include "Brushes/SlateRoundedBoxBrush.h"
 
 FMidiPianorollStyle::FMidiPianorollStyle()
 {
+	NoteBrush = FSlateRoundedBoxBrush(FStyleColors::White, 2.0f, FStyleColors::AccentBlack, 1.0f);
 }
 
 FMidiPianorollStyle::~FMidiPianorollStyle()

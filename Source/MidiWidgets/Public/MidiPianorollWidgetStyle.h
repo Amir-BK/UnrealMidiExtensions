@@ -76,6 +76,19 @@ struct MIDIWIDGETS_API FMidiPianorollStyle : public FSlateWidgetStyle
 	static const FName TypeName;
 	virtual const FName GetTypeName() const override { return TypeName; };
 	static const FMidiPianorollStyle& GetDefault();
+
+	UPROPERTY(EditAnywhere, Category = "Appearance")
+	FSlateBrush GridBrush;
+
+	UPROPERTY(EditAnywhere, Category = "Appearance")
+	FLinearColor GridColor;
+
+	UPROPERTY(EditAnywhere, Category = "Appearance")
+	FLinearColor AccidentalGridColor;
+
+	UPROPERTY(EditAnywhere, Category = "Appearance")
+	FSlateBrush NoteBrush;
+
 };
 
 /**

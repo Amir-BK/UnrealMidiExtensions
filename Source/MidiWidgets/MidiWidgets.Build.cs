@@ -39,8 +39,9 @@ public class MidiWidgets : ModuleRules
 			new string[]
 			{
 				"CoreUObject",
-				"Engine"
-			}
+				"Engine",
+                "InputCore"
+            }
 			);
 		
 		
