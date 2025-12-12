@@ -62,6 +62,12 @@ public:
 	//SWidget interface
     virtual FReply OnMouseMove(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override;
 
+	virtual FReply OnMouseButtonDown(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override;
+
+	virtual FReply OnMouseButtonUp(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override;
+
+	virtual FReply OnMouseWheel(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override;
+
 	TOptional<EMouseCursor::Type> GetCursor() const override;
 
     void SetMidiData(TSharedPtr<FMidiNotesData, ESPMode::ThreadSafe> InMidiData)
@@ -73,4 +79,5 @@ public:
 private:
 	bool bIsPanning = false;
 	bool bIsRightMouseButtonDown = false;
+	bool bIsZooming = false;
 };

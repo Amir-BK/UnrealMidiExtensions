@@ -55,7 +55,8 @@ void SMidiPianoroll::Construct(const FArguments& InArgs)
 }
 int32 SMidiPianoroll::OnPaint(const FPaintArgs& Args, const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements, int32 LayerId, const FWidgetStyle& InWidgetStyle, bool bParentEnabled) const
 {
-    const FSlateBrush* Brush = &PianorollStyle->NoteBrush;
+    const FSlateBrush* Brush = &PianorollStyle->GridBrush;
+	const FSlateBrush* NoteBrush = &PianorollStyle->NoteBrush;
 
     const FVector2D LocalSize = AllottedGeometry.GetLocalSize();
     const FVector2D LocalOffset = Offset.Get();
@@ -139,9 +140,9 @@ int32 SMidiPianoroll::OnPaint(const FPaintArgs& Args, const FGeometry& AllottedG
                     OutDrawElements,
                     LayerId,
                     AllottedGeometry.ToPaintGeometry(FVector2D(W, RowH), FSlateLayoutTransform(FVector2D(X, Y))),
-                    Brush,
+                    NoteBrush,
                     ESlateDrawEffect::None,
-                    TrackColor.CopyWithNewOpacity(0.9f));
+                    TrackColor);
             }
         }
     }
@@ -150,25 +151,74 @@ int32 SMidiPianoroll::OnPaint(const FPaintArgs& Args, const FGeometry& AllottedG
 }
 FReply SMidiPianoroll::OnMouseMove(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent)
 {
-    if (MouseEvent.IsMouseButtonDown(EKeys::RightMouseButton))
+
+    if (bIsRightMouseButtonDown)
     {
         const FVector2D CurrentPos = Offset.Get();
         const FVector2D Delta = MouseEvent.GetCursorDelta();
-        if(!Delta.IsNearlyZero())
+        if (!Delta.IsNearlyZero())
         {
             Offset.Set(*this, CurrentPos - Delta / Zoom.Get());
-			bIsPanning = true;
+            bIsPanning = true;
             return FReply::Handled();
         }
         else {
-			bIsPanning = false;
+            bIsPanning = false;
         }
-		bIsRightMouseButtonDown = true;
- 
     }
-    else {
-		bIsPanning = false;
-		bIsRightMouseButtonDown = false;
+ 
+
+
+    return FReply::Unhandled();
+}
+FReply SMidiPianoroll::OnMouseButtonDown(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent)
+{
+    if (MouseEvent.GetEffectingButton() == EKeys::LeftMouseButton)
+    {
+        // Handle left mouse button down
+    }
+
+    if (MouseEvent.GetEffectingButton() == EKeys::RightMouseButton)
+    {
+        bIsRightMouseButtonDown = true;
+        return FReply::Handled().CaptureMouse(SharedThis(this));
+	}
+
+	return FReply::Unhandled();
+}
+FReply SMidiPianoroll::OnMouseButtonUp(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent)
+{
+	//if right mouse button up
+    if (MouseEvent.GetEffectingButton() == EKeys::RightMouseButton)
+    {
+        bIsRightMouseButtonDown = false;
+        bIsPanning = false;
+        return FReply::Handled().ReleaseMouseCapture();
+	}
+    
+	return FReply::Unhandled();
+}
+FReply SMidiPianoroll::OnMouseWheel(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent)
+{
+	const bool bIsCtrlDown = MouseEvent.IsControlDown();
+    if (bIsCtrlDown)
+    {
+        const float WheelDelta = MouseEvent.GetWheelDelta();
+        FVector2D CurrentZoom = Zoom.Get();
+        const float ZoomFactor = 0.1f;
+        if (WheelDelta > 0)
+        {
+            CurrentZoom *= (1.0f + ZoomFactor);
+        }
+        else if (WheelDelta < 0)
+        {
+            CurrentZoom *= (1.0f - ZoomFactor);
+        }
+        // Clamp zoom levels
+        CurrentZoom.X = FMath::Clamp(CurrentZoom.X, 0.1f, 10.0f);
+        CurrentZoom.Y = FMath::Clamp(CurrentZoom.Y, 0.1f, 10.0f);
+        Zoom.Set(*this, CurrentZoom);
+		return FReply::Handled();
     }
     
     return FReply::Unhandled();
