@@ -25,6 +25,8 @@ struct MIDIWIDGETS_API FMidiTrackVisualizationData
 	FMidiTrackVisualizationData()
 		: bIsVisible(true)
 		, TrackColor(FLinearColor::White)
+		, TrackIndex(INDEX_NONE)
+		, ChannelIndex(INDEX_NONE)
 	{}
 
 	/** Whether this track is visible in the pianoroll */
@@ -35,16 +37,25 @@ struct MIDIWIDGETS_API FMidiTrackVisualizationData
 	UPROPERTY(EditAnywhere, Category = "Appearance")
 	FLinearColor TrackColor;
 
-	/** The color to use when rendering notes for this track */
+	/** Display name for this track */
 	UPROPERTY(EditAnywhere, Category = "Appearance")
 	FName TrackName;
 
+	/** Index of the track in the parent MIDI file */
 	UPROPERTY()
 	int32 TrackIndex;
 
+	/** MIDI channel index (0-15) - separate from track as one track can have multiple channels */
+	UPROPERTY()
+	int32 ChannelIndex;
+
 	bool operator==(const FMidiTrackVisualizationData& Other) const
 	{
-		return bIsVisible == Other.bIsVisible && TrackColor == Other.TrackColor && TrackName == Other.TrackName && TrackIndex == Other.TrackIndex;
+		return bIsVisible == Other.bIsVisible 
+			&& TrackColor == Other.TrackColor 
+			&& TrackName == Other.TrackName 
+			&& TrackIndex == Other.TrackIndex
+			&& ChannelIndex == Other.ChannelIndex;
 	}
 
 	bool operator!=(const FMidiTrackVisualizationData& Other) const

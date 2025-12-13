@@ -39,6 +39,10 @@ struct FMidiNotesTrack
 
     UPROPERTY()
     int32 TrackIndex = INDEX_NONE;
+
+    /** MIDI channel index (0-15) - separate from track as one track can have multiple channels */
+    UPROPERTY()
+    int32 ChannelIndex = INDEX_NONE;
 };
 
 USTRUCT(BlueprintType)

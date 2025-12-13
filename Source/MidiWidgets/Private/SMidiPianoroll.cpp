@@ -135,22 +135,28 @@ int32 SMidiPianoroll::OnPaint(const FPaintArgs& Args, const FGeometry& AllottedG
         {
             const FMidiNotesTrack& Track = LinkedMidiData->Tracks[TrackIdx];
             // Track color from visualization data if available
+            // Match by both TrackIndex AND ChannelIndex since one MIDI track can have multiple channels
             FLinearColor TrackColor = FLinearColor::White;
-            int32 IndexOfTrackVis = VisData.TrackVisualizations.IndexOfByPredicate([&](const FMidiTrackVisualizationData& Data)
+            int32 IndexOfTrackVis = VisData.TrackVisualizations.IndexOfByPredicate([&Track](const FMidiTrackVisualizationData& Data)
             {
-                return Data.TrackIndex == TrackIdx;
-				});
+                return Data.TrackIndex == Track.TrackIndex && Data.ChannelIndex == Track.ChannelIndex;
+            });
 
-            if(IndexOfTrackVis == INDEX_NONE)
+            // If not found by exact match, fall back to just TrackIndex match (legacy/simple case)
+            if (IndexOfTrackVis == INDEX_NONE)
             {
-                continue;
-			}
+                IndexOfTrackVis = VisData.TrackVisualizations.IndexOfByPredicate([&Track](const FMidiTrackVisualizationData& Data)
+                {
+                    return Data.TrackIndex == Track.TrackIndex;
+                });
+            }
 
-			const FMidiTrackVisualizationData* Vis = &VisData.TrackVisualizations[IndexOfTrackVis];
+            const FMidiTrackVisualizationData* Vis = (IndexOfTrackVis != INDEX_NONE) 
+                ? &VisData.TrackVisualizations[IndexOfTrackVis] 
+                : nullptr;
 
             if (Vis)
             {
-              
                 if (!Vis->bIsVisible) { continue; }
                 TrackColor = Vis->TrackColor;
             }
@@ -168,9 +174,10 @@ int32 SMidiPianoroll::OnPaint(const FPaintArgs& Args, const FGeometry& AllottedG
                     continue;
                 }
 
+                // Use TrackIdx for layer ordering to ensure consistent z-order
                 FSlateDrawElement::MakeBox(
                     OutDrawElements,
-                    LayerId + (VisData.TrackVisualizations.Num() - IndexOfTrackVis),
+                    LayerId + TrackIdx,
                     AllottedGeometry.ToPaintGeometry(FVector2D(W, RowH), FSlateLayoutTransform(FVector2D(X, Y))),
                     NoteBrush,
                     ESlateDrawEffect::None,
