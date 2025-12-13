@@ -136,11 +136,23 @@ int32 SMidiPianoroll::OnPaint(const FPaintArgs& Args, const FGeometry& AllottedG
             const FMidiNotesTrack& Track = LinkedMidiData->Tracks[TrackIdx];
             // Track color from visualization data if available
             FLinearColor TrackColor = FLinearColor::White;
-            if (VisData.TrackVisualizations.IsValidIndex(TrackIdx))
+            int32 IndexOfTrackVis = VisData.TrackVisualizations.IndexOfByPredicate([&](const FMidiTrackVisualizationData& Data)
             {
-                const FMidiTrackVisualizationData& Vis = VisData.TrackVisualizations[TrackIdx];
-                if (!Vis.bIsVisible) { continue; }
-                TrackColor = Vis.TrackColor;
+                return Data.TrackIndex == TrackIdx;
+				});
+
+            if(IndexOfTrackVis == INDEX_NONE)
+            {
+                continue;
+			}
+
+			const FMidiTrackVisualizationData* Vis = &VisData.TrackVisualizations[IndexOfTrackVis];
+
+            if (Vis)
+            {
+              
+                if (!Vis->bIsVisible) { continue; }
+                TrackColor = Vis->TrackColor;
             }
 
             for (const FLinkedMidiNote& Note : Track.Notes)
@@ -158,7 +170,7 @@ int32 SMidiPianoroll::OnPaint(const FPaintArgs& Args, const FGeometry& AllottedG
 
                 FSlateDrawElement::MakeBox(
                     OutDrawElements,
-                    LayerId + TrackIdx,
+                    LayerId + (VisData.TrackVisualizations.Num() - IndexOfTrackVis),
                     AllottedGeometry.ToPaintGeometry(FVector2D(W, RowH), FSlateLayoutTransform(FVector2D(X, Y))),
                     NoteBrush,
                     ESlateDrawEffect::None,

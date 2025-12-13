@@ -35,9 +35,16 @@ struct MIDIWIDGETS_API FMidiTrackVisualizationData
 	UPROPERTY(EditAnywhere, Category = "Appearance")
 	FLinearColor TrackColor;
 
+	/** The color to use when rendering notes for this track */
+	UPROPERTY(EditAnywhere, Category = "Appearance")
+	FName TrackName;
+
+	UPROPERTY()
+	int32 TrackIndex;
+
 	bool operator==(const FMidiTrackVisualizationData& Other) const
 	{
-		return bIsVisible == Other.bIsVisible && TrackColor == Other.TrackColor;
+		return bIsVisible == Other.bIsVisible && TrackColor == Other.TrackColor && TrackName == Other.TrackName && TrackIndex == Other.TrackIndex;
 	}
 
 	bool operator!=(const FMidiTrackVisualizationData& Other) const

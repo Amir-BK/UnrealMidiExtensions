@@ -40,6 +40,8 @@ FMidiFileVisualizationData FMidiFileVisualizationData::BuildFromMidiFile(UMidiFi
 			// Default settings; can be customized later
 			TrackVisData.bIsVisible = true;
 			TrackVisData.TrackColor = FLinearColor::MakeRandomColor();
+			TrackVisData.TrackName = FName(*MidiFile->GetTrack(TrackIdx)->GetName());
+			TrackVisData.TrackIndex = TrackIdx;
 		}
 	}
 	return VisualizationData;
