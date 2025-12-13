@@ -54,14 +54,13 @@ struct MIDIWIDGETS_API FMidiFileVisualizationData
 	UPROPERTY(EditFixedSize, EditAnywhere, Category = "Appearance")
 	TArray<FMidiTrackVisualizationData> TrackVisualizations;
 
-	UPROPERTY(BlueprintReadWrite,EditAnywhere, Category = "Appearance")
-	EMidiTrackTimeMode TimeDisplayMode = EMidiTrackTimeMode::TimeLinear;
+
 
 	static FMidiFileVisualizationData BuildFromMidiFile(UMidiFile* MidiFile);
 
 	bool operator==(const FMidiFileVisualizationData& Other) const
 	{
-		return TrackVisualizations == Other.TrackVisualizations && TimeDisplayMode == Other.TimeDisplayMode;
+		return TrackVisualizations == Other.TrackVisualizations;
 	}
 
 	bool operator!=(const FMidiFileVisualizationData& Other) const

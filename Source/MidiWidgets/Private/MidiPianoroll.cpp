@@ -10,8 +10,17 @@ void UMidiPianoroll::SetMidiFile(UMidiFile* InMidiFile)
     LinkedMidiFile = InMidiFile;
     if (PianorollWidget.IsValid())
     {
-        PianorollWidget->SetMidiData(FMidiNotesData::BuildFromMidiFile(LinkedMidiFile));
-        VisualizationData = FMidiFileVisualizationData::BuildFromMidiFile(LinkedMidiFile);
+        if (LinkedMidiFile)
+        {
+            TSharedPtr<FSongMaps, ESPMode::ThreadSafe> SongsMap = MakeShared<FSongMaps, ESPMode::ThreadSafe>(*LinkedMidiFile->GetSongMaps());
+            PianorollWidget->SetMidiData(FMidiNotesData::BuildFromMidiFile(LinkedMidiFile), SongsMap);
+            VisualizationData = FMidiFileVisualizationData::BuildFromMidiFile(LinkedMidiFile);
+        }
+        else
+        {
+            PianorollWidget->SetMidiData(nullptr, nullptr);
+            VisualizationData = FMidiFileVisualizationData();
+        }
     }
 }
 
@@ -28,10 +37,12 @@ TSharedRef<SWidget> UMidiPianoroll::RebuildWidget()
     }
 
     SAssignNew(PianorollWidget, SMidiPianoroll)
+        .Clipping(EWidgetClipping::ClipToBounds)
         .LinkedMidiData(MidiData)
         .LinkedSongsMap(SongsMap)
         // Bind to getter using lambda - will be called each frame during paint
         .VisualizationData(TAttribute<FMidiFileVisualizationData>::CreateLambda([this]() { return GetVisualizationData(); }))
+		.TimeMode(TAttribute<EMidiTrackTimeMode>::CreateLambda([this]() { return GetTimeDisplayMode(); }))
         .PianorollStyle(&PianorollStyle)
         .Offset(FVector2D::ZeroVector)
         .Zoom(FVector2D(1.0f, 1.0f));

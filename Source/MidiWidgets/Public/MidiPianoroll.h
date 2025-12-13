@@ -23,6 +23,9 @@ public:
 	UPROPERTY(EditAnywhere, Category = "MIDI")
 	FMidiFileVisualizationData VisualizationData;
 
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "MIDI")
+	EMidiTrackTimeMode TimeDisplayMode = EMidiTrackTimeMode::TimeLinear;
+
 	UPROPERTY(EditAnywhere, Category = "Appearance")
 	FMidiPianorollStyle PianorollStyle;
 
@@ -31,6 +34,8 @@ public:
 
 	// Getter for attribute binding
 	const FMidiFileVisualizationData& GetVisualizationData() { return VisualizationData; }
+
+	const EMidiTrackTimeMode GetTimeDisplayMode() const { return TimeDisplayMode; }
 
 	TSharedRef<SWidget> RebuildWidget() override;
 
