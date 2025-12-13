@@ -10,6 +10,13 @@
 
 class UMidiFile;
 
+UENUM(BlueprintType)
+enum class EMidiTrackTimeMode : uint8
+{
+	TickLinear UMETA(DisplayName = "Tick Linear"),
+	TimeLinear UMETA(DisplayName = "Time Linear"),
+};
+
 USTRUCT()
 struct MIDIWIDGETS_API FMidiTrackVisualizationData
 {
@@ -39,7 +46,7 @@ struct MIDIWIDGETS_API FMidiTrackVisualizationData
 	}
 };
 
-USTRUCT()
+USTRUCT(BlueprintType)
 struct MIDIWIDGETS_API FMidiFileVisualizationData
 {
 	GENERATED_BODY()
@@ -47,17 +54,22 @@ struct MIDIWIDGETS_API FMidiFileVisualizationData
 	UPROPERTY(EditFixedSize, EditAnywhere, Category = "Appearance")
 	TArray<FMidiTrackVisualizationData> TrackVisualizations;
 
+	UPROPERTY(BlueprintReadWrite,EditAnywhere, Category = "Appearance")
+	EMidiTrackTimeMode TimeDisplayMode = EMidiTrackTimeMode::TimeLinear;
+
 	static FMidiFileVisualizationData BuildFromMidiFile(UMidiFile* MidiFile);
 
 	bool operator==(const FMidiFileVisualizationData& Other) const
 	{
-		return TrackVisualizations == Other.TrackVisualizations;
+		return TrackVisualizations == Other.TrackVisualizations && TimeDisplayMode == Other.TimeDisplayMode;
 	}
 
 	bool operator!=(const FMidiFileVisualizationData& Other) const
 	{
 		return !(*this == Other);
 	}
+
+
 };
 
 /**

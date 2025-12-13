@@ -138,15 +138,16 @@ int32 SMidiPianoroll::OnPaint(const FPaintArgs& Args, const FGeometry& AllottedG
 
                 FSlateDrawElement::MakeBox(
                     OutDrawElements,
-                    LayerId,
+                    LayerId + TrackIdx,
                     AllottedGeometry.ToPaintGeometry(FVector2D(W, RowH), FSlateLayoutTransform(FVector2D(X, Y))),
                     NoteBrush,
                     ESlateDrawEffect::None,
                     TrackColor);
             }
         }
+        LayerId += LinkedMidiData->Tracks.Num();
     }
-
+ 
     return LayerId;
 }
 FReply SMidiPianoroll::OnMouseMove(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent)
@@ -200,28 +201,57 @@ FReply SMidiPianoroll::OnMouseButtonUp(const FGeometry& MyGeometry, const FPoint
 }
 FReply SMidiPianoroll::OnMouseWheel(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent)
 {
-	const bool bIsCtrlDown = MouseEvent.IsControlDown();
-    if (bIsCtrlDown)
+    const bool bIsCtrlDown = MouseEvent.IsControlDown();
+    const bool bIsShiftDown = MouseEvent.IsShiftDown();
+    const float WheelDelta = MouseEvent.GetWheelDelta();
+    
+    // Get current values
+    FVector2D CurrentZoom = Zoom.Get();
+    FVector2D CurrentOffset = Offset.Get();
+    
+    // Calculate mouse position in local widget space
+    const FVector2D LocalMousePos = MyGeometry.AbsoluteToLocal(MouseEvent.GetScreenSpacePosition());
+    
+    // Calculate the content position under the mouse cursor before zoom
+    // Screen position = ContentPos * Zoom - Offset
+    // ContentPos = (ScreenPos + Offset) / Zoom
+    const FVector2D ContentPosUnderMouse = (LocalMousePos + CurrentOffset) / CurrentZoom;
+    
+    FVector2D NewZoom = CurrentZoom;
+    
+    if (bIsShiftDown)
     {
-        const float WheelDelta = MouseEvent.GetWheelDelta();
-        FVector2D CurrentZoom = Zoom.Get();
-        const float ZoomFactor = 0.1f;
-        if (WheelDelta > 0)
-        {
-            CurrentZoom *= (1.0f + ZoomFactor);
-        }
-        else if (WheelDelta < 0)
-        {
-            CurrentZoom *= (1.0f - ZoomFactor);
-        }
-        // Clamp zoom levels
-        CurrentZoom.X = FMath::Clamp(CurrentZoom.X, 0.1f, 10.0f);
-        CurrentZoom.Y = FMath::Clamp(CurrentZoom.Y, 0.1f, 10.0f);
-        Zoom.Set(*this, CurrentZoom);
-		return FReply::Handled();
+        // Vertical zoom only
+        const float ZoomFactor = WheelDelta > 0 ? 1.1f : 0.9f;
+        NewZoom.Y *= ZoomFactor;
+        NewZoom.Y = FMath::Clamp(NewZoom.Y, 0.1f, 10.0f);
+    }
+    else if (bIsCtrlDown)
+    {
+        // Horizontal zoom only
+        const float ZoomFactor = WheelDelta > 0 ? 1.1f : 0.9f;
+        NewZoom.X *= ZoomFactor;
+        NewZoom.X = FMath::Clamp(NewZoom.X, 0.1f, 10.0f);
+    }
+    else
+    {
+        // Plain scroll = vertical pan (scroll through notes)
+        const float ScrollAmount = WheelDelta * 30.0f;
+        CurrentOffset.Y -= ScrollAmount;
+        Offset.Set(*this, CurrentOffset);
+        return FReply::Handled();
     }
     
-    return FReply::Unhandled();
+    // Calculate new offset to keep the same content under the mouse cursor
+    // After zoom: ScreenPos = ContentPos * NewZoom - NewOffset
+    // We want: LocalMousePos = ContentPosUnderMouse * NewZoom - NewOffset
+    // Therefore: NewOffset = ContentPosUnderMouse * NewZoom - LocalMousePos
+    const FVector2D NewOffset = ContentPosUnderMouse * NewZoom - LocalMousePos;
+    
+    Zoom.Set(*this, NewZoom);
+    Offset.Set(*this, NewOffset);
+    
+    return FReply::Handled();
 }
 TOptional<EMouseCursor::Type> SMidiPianoroll::GetCursor() const
 {
