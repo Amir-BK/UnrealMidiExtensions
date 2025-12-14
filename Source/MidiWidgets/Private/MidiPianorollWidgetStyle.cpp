@@ -4,6 +4,7 @@
 #include "MidiPianorollWidgetStyle.h"
 #include "HarmonixMidi/MidiFile.h"
 #include "Brushes/SlateRoundedBoxBrush.h"
+#include "Settings/MidiExtensionsDevSettings.h"
 
 FMidiPianorollStyle::FMidiPianorollStyle()
 {
@@ -76,7 +77,15 @@ FMidiFileVisualizationData FMidiFileVisualizationData::BuildFromMidiFile(UMidiFi
 			
 			TrackVisData.bIsVisible = true;
 			// Use seeded random color for consistency across reloads
-			TrackVisData.TrackColor = FLinearColor::IntToDistinctColor(ChannelIdx * 16 + TrackIdx);
+			const UMidiExtensionsDevSettings* DevSettings = GetDefault<UMidiExtensionsDevSettings>();
+			if (DevSettings && DevSettings->DefaultTrackColors.IsValidIndex(ChannelIdx))
+			{
+				TrackVisData.TrackColor = DevSettings->DefaultTrackColors[ChannelIdx];
+			}
+			else
+			{
+				TrackVisData.TrackColor = FLinearColor::IntToDistinctColor(ChannelIdx);
+			}
 			
 			// Create descriptive name including channel if different from primary
 			const FMidiTrack* Track = MidiFile->GetTrack(TrackIdx);

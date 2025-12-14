@@ -43,7 +43,11 @@ struct FMidiNotesTrack
     /** MIDI channel index (0-15) - separate from track as one track can have multiple channels */
     UPROPERTY()
     int32 ChannelIndex = INDEX_NONE;
+
+
 };
+
+
 
 USTRUCT(BlueprintType)
 struct MIDIEXTENSIONS_API FMidiNotesData
@@ -55,3 +59,40 @@ struct MIDIEXTENSIONS_API FMidiNotesData
 
 	static TSharedPtr<FMidiNotesData> BuildFromMidiFile(class UMidiFile* MidiFile);
 };
+
+USTRUCT(BlueprintType, meta = (HasNativeMake = "/Script/MidiExtensions.MidiExtensionsHelperLib.MakeMidiFileIterator"))
+struct MIDIEXTENSIONS_API FMidiFileIterator
+{
+    GENERATED_BODY()
+    UPROPERTY()
+    FMidiNotesData MidiData;
+    UPROPERTY()
+    int32 CurrentTrackIndex = 0;
+    UPROPERTY()
+    int32 CurrentNoteIndex = 0;
+    bool IsValid() const
+    {
+        if (CurrentTrackIndex < 0 || CurrentTrackIndex >= MidiData.Tracks.Num())
+        {
+            return false;
+        }
+        if (CurrentNoteIndex < 0 || CurrentNoteIndex >= MidiData.Tracks[CurrentTrackIndex].Notes.Num())
+        {
+            return false;
+        }
+        return true;
+    }
+    FLinkedMidiNote GetCurrentNote() const
+    {
+        const FMidiNotesTrack& Track = MidiData.Tracks[CurrentTrackIndex];
+        check(CurrentNoteIndex >= 0 && CurrentNoteIndex < Track.Notes.Num());
+        return Track.Notes[CurrentNoteIndex];
+    }
+};
+
+    //FLinkedMidiNote GetCurrentNote() const
+    //{
+    //   // const FMidiNotesTrack& Track = MidiData.Tracks[CurrentTrackIndex];
+    //   // check(CurrentNoteIndex >= 0 && CurrentNoteIndex < Track.Notes.Num());
+    //    return Track.Notes[CurrentNoteIndex];
+    //}
