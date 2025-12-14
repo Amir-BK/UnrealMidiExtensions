@@ -76,7 +76,7 @@ FMidiFileVisualizationData FMidiFileVisualizationData::BuildFromMidiFile(UMidiFi
 			
 			TrackVisData.bIsVisible = true;
 			// Use seeded random color for consistency across reloads
-			TrackVisData.TrackColor = FLinearColor::MakeRandomSeededColor(ChannelIdx * 16 + TrackIdx);
+			TrackVisData.TrackColor = FLinearColor::IntToDistinctColor(ChannelIdx * 16 + TrackIdx);
 			
 			// Create descriptive name including channel if different from primary
 			const FMidiTrack* Track = MidiFile->GetTrack(TrackIdx);
@@ -95,5 +95,8 @@ FMidiFileVisualizationData FMidiFileVisualizationData::BuildFromMidiFile(UMidiFi
 			TrackVisData.ChannelIndex = ChannelIdx;
 		}
 	}
+
+	
+
 	return VisualizationData;
 }

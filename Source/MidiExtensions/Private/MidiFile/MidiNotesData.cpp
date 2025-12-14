@@ -143,6 +143,15 @@ TSharedPtr<FMidiNotesData> FMidiNotesData::BuildFromMidiFile(UMidiFile* MidiFile
             }
         }
     }
+
+	// Finally sort notes in each track by NoteOnTick
+    for (FMidiNotesTrack& NotesTrack : LinkedMidiData->Tracks)
+    {
+        NotesTrack.Notes.Sort([](const FLinkedMidiNote& A, const FLinkedMidiNote& B)
+        {
+            return A.NoteOnTick < B.NoteOnTick;
+        });
+	} 
     
     return LinkedMidiData;
 }

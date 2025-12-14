@@ -40,7 +40,8 @@ public class MidiExtensions : ModuleRules
 				"SlateCore",
 				"Harmonix",
 				"HarmonixMidi",
-                "AudioExtensions"
+                "AudioExtensions",
+				"DeveloperSettings"
 				// ... add private dependencies that you statically link with here ...	
 			}
 			);
