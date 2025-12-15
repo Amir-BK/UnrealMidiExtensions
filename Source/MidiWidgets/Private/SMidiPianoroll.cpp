@@ -279,7 +279,7 @@ FReply SMidiPianoroll::OnMouseWheel(const FGeometry& MyGeometry, const FPointerE
         // Horizontal zoom only
         const float ZoomFactor = WheelDelta > 0 ? 1.1f : 0.9f;
         NewZoom.X *= ZoomFactor;
-        NewZoom.X = FMath::Clamp(NewZoom.X, 0.1f, 10.0f);
+        NewZoom.X = FMath::Clamp(NewZoom.X, 0.001f, 10.0f);
     }
     else
     {

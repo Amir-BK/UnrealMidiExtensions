@@ -82,10 +82,6 @@ struct MIDIWIDGETS_API FMidiFileVisualizationData
 	UPROPERTY(EditFixedSize, EditAnywhere, Category = "Appearance", meta = (TitleProperty = "TrackName"))
 	TArray<FMidiTrackVisualizationData> TrackVisualizations;
 
-
-
-	static FMidiFileVisualizationData BuildFromMidiFile(UMidiFile* MidiFile);
-
 	static FMidiFileVisualizationData BuildFromLinkedMidiData(FMidiNotesData& LinkedMidiData);
 
 	bool operator==(const FMidiFileVisualizationData& Other) const

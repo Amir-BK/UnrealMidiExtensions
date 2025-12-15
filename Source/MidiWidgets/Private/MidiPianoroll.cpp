@@ -34,7 +34,7 @@ TSharedRef<SWidget> UMidiPianoroll::RebuildWidget()
     {
         MidiData = FMidiNotesData::BuildFromMidiFile(LinkedMidiFile);
         SongsMap = MakeShared<FSongMaps, ESPMode::ThreadSafe>(*LinkedMidiFile->GetSongMaps());
-        VisualizationData = FMidiFileVisualizationData::BuildFromMidiFile(LinkedMidiFile);
+        VisualizationData = FMidiFileVisualizationData::BuildFromLinkedMidiData(*MidiData);
     }
 
     SAssignNew(PianorollWidget, SMidiPianoroll)
