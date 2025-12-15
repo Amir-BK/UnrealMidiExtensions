@@ -9,7 +9,7 @@
 
 FMidiPianorollStyle::FMidiPianorollStyle()
 {
-	NoteBrush = FSlateRoundedBoxBrush(FStyleColors::White, 2.0f, FStyleColors::AccentBlack, 1.0f);
+	NoteBrush = FSlateRoundedBoxBrush(FSlateColor(FColor::White), 2.0f, FSlateColor(FColor::Black), 1.0f);
 }
 
 FMidiPianorollStyle::~FMidiPianorollStyle()

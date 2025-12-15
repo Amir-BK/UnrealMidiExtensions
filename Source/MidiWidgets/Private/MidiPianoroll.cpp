@@ -59,6 +59,8 @@ void UMidiPianoroll::ReleaseSlateResources(bool bReleaseChildren)
     PianorollWidget.Reset();
 }
 
+#if WITH_EDITOR
+
 void UMidiPianoroll::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
 {
     Super::PostEditChangeProperty(PropertyChangedEvent);
@@ -68,3 +70,5 @@ void UMidiPianoroll::PostEditChangeProperty(FPropertyChangedEvent& PropertyChang
 		SetMidiFile(LinkedMidiFile);
 	}
 }
+
+#endif
