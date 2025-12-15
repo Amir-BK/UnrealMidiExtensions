@@ -61,6 +61,8 @@ public:
 		SLATE_ARGUMENT(float, TimelineHeight)
 		/** Grid point type */
 		SLATE_ATTRIBUTE(EPianorollGridPointType, GridPointType)
+		/** Is file editable (support selection, moving notes, etc.) */
+		SLATE_ARGUMENT_DEFAULT(bool, bIsEditable) { false };
 	SLATE_END_ARGS()
 
 	SMidiPianoroll();
@@ -89,6 +91,8 @@ TSlateAttribute<FMidiFileVisualizationData> VisualizationData;
 	TSlateAttribute<EMidiTrackTimeMode> TimeMode;
 
 	TSlateAttribute<EPianorollGridPointType> GridPointType;
+
+	bool bIsEditable;
 
 	/** Height of the timeline header */
 	float TimelineHeight = 25.0f;
@@ -122,9 +126,33 @@ public:
 
 
 private:
-	bool bIsPanning = false;
-	bool bIsRightMouseButtonDown = false;
-	bool bIsZooming = false;
+bool bIsPanning = false;
+bool bIsRightMouseButtonDown = false;
+bool bIsZooming = false;
+
+// Marquee selection
+bool bIsMarqueeSelecting;
+FVector2D MarqueeStartPos;
+FVector2D MarqueeCurrentPos;
+	
+// Selected notes identified by track index and note index
+struct FNoteIdentifier
+{
+int32 TrackIndex;
+int32 NoteIndex;
+
+bool operator==(const FNoteIdentifier& Other) const
+{
+return TrackIndex == Other.TrackIndex && NoteIndex == Other.NoteIndex;
+}
+
+friend uint32 GetTypeHash(const FNoteIdentifier& Key)
+{
+return HashCombine(GetTypeHash(Key.TrackIndex), GetTypeHash(Key.NoteIndex));
+}
+};
+	
+TSet<FNoteIdentifier> SelectedNotes;
 
 	/** Uses the current zoom, the song map, and the time mode to convert a tick to a pixel position */
 	double TickToPixel(double Tick) const;
@@ -155,4 +183,10 @@ private:
 
 	/** Clamps the offset to valid bounds based on viewport and content size */
 	FVector2D ClampOffset(const FVector2D& InOffset, const FVector2D& ViewportSize) const;
+
+	/** Performs marquee selection based on current marquee rectangle */
+	void PerformMarqueeSelection(const FGeometry& MyGeometry, bool bAddToSelection);
+
+	/** Checks if a note is currently selected */
+	bool IsNoteSelected(int32 TrackIndex, int32 NoteIndex) const;
 };

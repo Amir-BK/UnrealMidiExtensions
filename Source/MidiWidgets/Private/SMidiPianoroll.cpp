@@ -52,6 +52,7 @@ void SMidiPianoroll::Construct(const FArguments& InArgs)
 	LinkedSongsMap = InArgs._LinkedSongsMap;
 	PianorollStyle = InArgs._PianorollStyle ? InArgs._PianorollStyle : &FMidiPianorollStyle::GetDefault();
 	TimelineHeight = InArgs._TimelineHeight;
+	bIsEditable = InArgs._bIsEditable;
 
 	Offset.Assign(*this, InArgs._Offset);
 	Zoom.Assign(*this, InArgs._Zoom);
@@ -68,6 +69,7 @@ int32 SMidiPianoroll::OnPaint(const FPaintArgs& Args, const FGeometry& AllottedG
 {
     const FSlateBrush* Brush = &PianorollStyle->GridBrush;
 	const FSlateBrush* NoteBrush = &PianorollStyle->NoteBrush;
+	const FSlateBrush* SelectedNoteBrush = &PianorollStyle->SelectedNoteBrush;
 
     const FVector2D LocalSize = AllottedGeometry.GetLocalSize();
     const FVector2D LocalOffset = Offset.Get();
@@ -164,8 +166,9 @@ int32 SMidiPianoroll::OnPaint(const FPaintArgs& Args, const FGeometry& AllottedG
                 TrackColor = Vis->TrackColor;
             }
 
-            for (const FLinkedMidiNote& Note : Track.Notes)
+            for (int32 NoteIdx = 0; NoteIdx < Track.Notes.Num(); ++NoteIdx)
             {
+                const FLinkedMidiNote& Note = Track.Notes[NoteIdx];
                 const float X = TickToPixel(Note.NoteOnTick) - LocalOffset.X;
                 const float EndX = TickToPixel(Note.NoteOffTick) - LocalOffset.X;
                 const float W = FMath::Max(EndX - X, 1.0f);
@@ -177,12 +180,17 @@ int32 SMidiPianoroll::OnPaint(const FPaintArgs& Args, const FGeometry& AllottedG
                     continue;
                 }
 
+                // Check if note is selected
+                const bool bIsSelected = IsNoteSelected(TrackIdx, NoteIdx);
+                const FSlateBrush* CurrentNoteBrush = bIsSelected ? SelectedNoteBrush : NoteBrush;
+               // FLinearColor NoteColor = bIsSelected ? FLinearColor::White : TrackColor;
+
                 // Use TrackIdx for layer ordering to ensure consistent z-order
                 FSlateDrawElement::MakeBox(
                     OutDrawElements,
                     LayerId + TrackIdx,
                     AllottedGeometry.ToPaintGeometry(FVector2D(W, RowH), FSlateLayoutTransform(FVector2D(X, Y))),
-                    NoteBrush,
+                    CurrentNoteBrush,
                     ESlateDrawEffect::None,
                     TrackColor);
             }
@@ -191,13 +199,63 @@ int32 SMidiPianoroll::OnPaint(const FPaintArgs& Args, const FGeometry& AllottedG
     }
     LayerId++;
 
-    // Layer 4: Paint timeline header (on top of everything)
+    // Layer 4: Draw marquee selection rectangle
+    if (bIsMarqueeSelecting)
+    {
+        const FVector2D MarqueeMin(
+            FMath::Min(MarqueeStartPos.X, MarqueeCurrentPos.X),
+            FMath::Min(MarqueeStartPos.Y, MarqueeCurrentPos.Y)
+        );
+        const FVector2D MarqueeSize(
+            FMath::Abs(MarqueeCurrentPos.X - MarqueeStartPos.X),
+            FMath::Abs(MarqueeCurrentPos.Y - MarqueeStartPos.Y)
+        );
+        
+        // Draw filled semi-transparent rectangle
+        FSlateDrawElement::MakeBox(
+            OutDrawElements,
+            LayerId++,
+            AllottedGeometry.ToPaintGeometry(MarqueeSize, FSlateLayoutTransform(MarqueeMin)),
+            FAppStyle::GetBrush("MarqueeSelection"),
+            ESlateDrawEffect::None,
+            FLinearColor(0.2f, 0.5f, 1.0f, 0.3f)
+        );
+        
+        // Draw border
+        TArray<FVector2D> Lines = {
+            MarqueeMin,
+            FVector2D(MarqueeMin.X + MarqueeSize.X, MarqueeMin.Y),
+            FVector2D(MarqueeMin.X + MarqueeSize.X, MarqueeMin.Y + MarqueeSize.Y),
+            FVector2D(MarqueeMin.X, MarqueeMin.Y + MarqueeSize.Y),
+            MarqueeMin
+        };
+        
+        FSlateDrawElement::MakeLines(
+            OutDrawElements,
+            LayerId++,
+            AllottedGeometry.ToPaintGeometry(),
+            Lines,
+            ESlateDrawEffect::None,
+            FLinearColor(0.2f, 0.5f, 1.0f, 0.8f),
+            true,
+            2.0f
+        );
+    }
+
+    // Layer 5: Paint timeline header (on top of everything)
     LayerId = PaintTimeline(AllottedGeometry, OutDrawElements, LayerId);
  
     return LayerId;
 }
 FReply SMidiPianoroll::OnMouseMove(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent)
 {
+    if (bIsMarqueeSelecting)
+    {
+        MarqueeCurrentPos = MyGeometry.AbsoluteToLocal(MouseEvent.GetScreenSpacePosition());
+        // Force repaint to show marquee
+        return FReply::Handled();
+    }
+    
     if (bIsRightMouseButtonDown)
     {
         const FVector2D CurrentPos = Offset.Get();
@@ -222,9 +280,20 @@ FReply SMidiPianoroll::OnMouseMove(const FGeometry& MyGeometry, const FPointerEv
 }
 FReply SMidiPianoroll::OnMouseButtonDown(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent)
 {
-    if (MouseEvent.GetEffectingButton() == EKeys::LeftMouseButton)
+	if (MouseEvent.GetEffectingButton() == EKeys::LeftMouseButton && bIsEditable)
     {
-        // Handle left mouse button down
+        // Start marquee selection
+        bIsMarqueeSelecting = true;
+        MarqueeStartPos = MyGeometry.AbsoluteToLocal(MouseEvent.GetScreenSpacePosition());
+        MarqueeCurrentPos = MarqueeStartPos;
+        
+        // Clear previous selection if not holding Shift
+        if (!MouseEvent.IsShiftDown())
+        {
+            SelectedNotes.Empty();
+        }
+        
+        return FReply::Handled().CaptureMouse(SharedThis(this));
     }
 
     if (MouseEvent.GetEffectingButton() == EKeys::RightMouseButton)
@@ -237,6 +306,17 @@ FReply SMidiPianoroll::OnMouseButtonDown(const FGeometry& MyGeometry, const FPoi
 }
 FReply SMidiPianoroll::OnMouseButtonUp(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent)
 {
+    if (MouseEvent.GetEffectingButton() == EKeys::LeftMouseButton)
+    {
+        if (bIsMarqueeSelecting)
+        {
+            // Calculate selection bounds in content space
+            PerformMarqueeSelection(MyGeometry, MouseEvent.IsShiftDown());
+            bIsMarqueeSelecting = false;
+            return FReply::Handled().ReleaseMouseCapture();
+        }
+    }
+    
 	//if right mouse button up
     if (MouseEvent.GetEffectingButton() == EKeys::RightMouseButton)
     {
@@ -305,6 +385,11 @@ FReply SMidiPianoroll::OnMouseWheel(const FGeometry& MyGeometry, const FPointerE
 }
 TOptional<EMouseCursor::Type> SMidiPianoroll::GetCursor() const
 {
+    if (bIsMarqueeSelecting)
+    {
+        return EMouseCursor::Crosshairs;
+    }
+    
     if (bIsRightMouseButtonDown)
     {
         if (bIsPanning)
@@ -697,6 +782,95 @@ FVector2D SMidiPianoroll::ClampOffset(const FVector2D& InOffset, const FVector2D
     ClampedOffset.Y = FMath::Clamp(ClampedOffset.Y, MinOffsetY, MaxOffsetY);
     
     return ClampedOffset;
+}
+
+void SMidiPianoroll::PerformMarqueeSelection(const FGeometry& MyGeometry, bool bAddToSelection)
+{
+    if (!LinkedMidiData.IsValid())
+    {
+        return;
+    }
+    
+    const FVector2D LocalOffset = Offset.Get();
+    const FVector2D LocalZoom = Zoom.Get();
+    const float ContentStartY = TimelineHeight;
+    
+    // Calculate marquee bounds (min/max to handle any drag direction)
+    const FVector2D MarqueeMin(
+        FMath::Min(MarqueeStartPos.X, MarqueeCurrentPos.X),
+        FMath::Min(MarqueeStartPos.Y, MarqueeCurrentPos.Y)
+    );
+    const FVector2D MarqueeMax(
+        FMath::Max(MarqueeStartPos.X, MarqueeCurrentPos.X),
+        FMath::Max(MarqueeStartPos.Y, MarqueeCurrentPos.Y)
+    );
+    
+    // Iterate through all notes and check intersection
+    for (int32 TrackIdx = 0; TrackIdx < LinkedMidiData->Tracks.Num(); ++TrackIdx)
+    {
+        const FMidiNotesTrack& Track = LinkedMidiData->Tracks[TrackIdx];
+
+		// Need to check if track is visible in visualization data
+		const FMidiFileVisualizationData& VisData = VisualizationData.Get();
+        int32 IndexOfTrackVis = VisData.TrackVisualizations.IndexOfByPredicate([&Track](const FMidiTrackVisualizationData& Data)
+            {
+                return Data.TrackIndex == Track.TrackIndex && Data.ChannelIndex == Track.ChannelIndex;
+            });
+
+        // If not found by exact match, fall back to just TrackIndex match (legacy/simple case)
+        if (IndexOfTrackVis == INDEX_NONE)
+        {
+            IndexOfTrackVis = VisData.TrackVisualizations.IndexOfByPredicate([&Track](const FMidiTrackVisualizationData& Data)
+                {
+                    return Data.TrackIndex == Track.TrackIndex;
+                });
+        }
+
+        const FMidiTrackVisualizationData* Vis = (IndexOfTrackVis != INDEX_NONE) 
+            ? &VisData.TrackVisualizations[IndexOfTrackVis] 
+			: nullptr;
+        if (Vis)
+        {
+            if (!Vis->bIsVisible) { continue; }
+		}
+
+        
+        for (int32 NoteIdx = 0; NoteIdx < Track.Notes.Num(); ++NoteIdx)
+        {
+            const FLinkedMidiNote& Note = Track.Notes[NoteIdx];
+            
+            // Calculate note bounds in screen space
+            const float NoteX = TickToPixel(Note.NoteOnTick) - LocalOffset.X;
+            const float NoteEndX = TickToPixel(Note.NoteOffTick) - LocalOffset.X;
+            const float RowH = 10.0f * LocalZoom.Y;
+            const float NoteY = ContentStartY + (127 - Note.NoteNumber) * (RowH + 2.0f) - LocalOffset.Y;
+            const float NoteH = RowH;
+            
+            // Check intersection with marquee
+            const bool bIntersects = 
+                NoteX < MarqueeMax.X && 
+                NoteEndX > MarqueeMin.X &&
+                NoteY < MarqueeMax.Y && 
+                NoteY + NoteH > MarqueeMin.Y;
+            
+            if (bIntersects)
+            {
+                // Add to selection
+                FNoteIdentifier NoteId;
+                NoteId.TrackIndex = TrackIdx;
+                NoteId.NoteIndex = NoteIdx;
+                SelectedNotes.Add(NoteId);
+            }
+        }
+    }
+}
+
+bool SMidiPianoroll::IsNoteSelected(int32 TrackIndex, int32 NoteIndex) const
+{
+    FNoteIdentifier NoteId;
+    NoteId.TrackIndex = TrackIndex;
+    NoteId.NoteIndex = NoteIndex;
+    return SelectedNotes.Contains(NoteId);
 }
 
 END_SLATE_FUNCTION_BUILD_OPTIMIZATION

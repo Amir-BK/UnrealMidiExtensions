@@ -10,6 +10,7 @@
 FMidiPianorollStyle::FMidiPianorollStyle()
 {
 	NoteBrush = FSlateRoundedBoxBrush(FSlateColor(FColor::White), 2.0f, FSlateColor(FColor::Black), 1.0f);
+	SelectedNoteBrush = FSlateRoundedBoxBrush(FSlateColor(FColor::Yellow), 2.0f, FSlateColor(FColor::Yellow), 2.0f);
 }
 
 FMidiPianorollStyle::~FMidiPianorollStyle()
@@ -27,6 +28,8 @@ const FMidiPianorollStyle& FMidiPianorollStyle::GetDefault()
 void FMidiPianorollStyle::GetResources(TArray<const FSlateBrush*>& OutBrushes) const
 {
 	// Add any brush resources here so that Slate can correctly atlas and reference them
+	OutBrushes.Add(&NoteBrush);
+	OutBrushes.Add(&SelectedNoteBrush);
 }
 
 

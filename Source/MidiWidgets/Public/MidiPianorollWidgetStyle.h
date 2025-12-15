@@ -44,7 +44,7 @@ struct MIDIWIDGETS_API FMidiTrackVisualizationData
 	bool bIsVisible;
 
 	/** The color to use when rendering notes for this track */
-	UPROPERTY(EditAnywhere, Category = "Appearance")
+	UPROPERTY(EditAnywhere, Category = "Appearance", meta = (HideAlphaChannel))
 	FLinearColor TrackColor;
 
 	/** Display name for this track */
@@ -125,6 +125,9 @@ struct MIDIWIDGETS_API FMidiPianorollStyle : public FSlateWidgetStyle
 
 	UPROPERTY(EditAnywhere, Category = "Appearance")
 	FSlateBrush NoteBrush;
+
+	UPROPERTY(EditAnywhere, Category = "Appearance")
+	FSlateBrush SelectedNoteBrush;
 
 };
 
