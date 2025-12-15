@@ -3,6 +3,7 @@
 
 #include "MidiPianorollWidgetStyle.h"
 #include "HarmonixMidi/MidiFile.h"
+#include "MidiFile/MidiNotesData.h"
 #include "Brushes/SlateRoundedBoxBrush.h"
 #include "Settings/MidiExtensionsDevSettings.h"
 
@@ -80,11 +81,11 @@ FMidiFileVisualizationData FMidiFileVisualizationData::BuildFromMidiFile(UMidiFi
 			const UMidiExtensionsDevSettings* DevSettings = GetDefault<UMidiExtensionsDevSettings>();
 			if (DevSettings && DevSettings->DefaultTrackColors.IsValidIndex(ChannelIdx))
 			{
-				TrackVisData.TrackColor = DevSettings->DefaultTrackColors[ChannelIdx];
+				TrackVisData.TrackColor = DevSettings->DefaultTrackColors[Idx];
 			}
 			else
 			{
-				TrackVisData.TrackColor = FLinearColor::IntToDistinctColor(ChannelIdx);
+				TrackVisData.TrackColor = FLinearColor::IntToDistinctColor(Idx);
 			}
 			
 			// Create descriptive name including channel if different from primary
@@ -106,6 +107,38 @@ FMidiFileVisualizationData FMidiFileVisualizationData::BuildFromMidiFile(UMidiFi
 	}
 
 	
+
+	return VisualizationData;
+}
+
+FMidiFileVisualizationData FMidiFileVisualizationData::BuildFromLinkedMidiData(FMidiNotesData& LinkedMidiData)
+{
+	FMidiFileVisualizationData VisualizationData;
+
+	// Build visualization data from linked MIDI data
+	int i = 0;
+	for (const auto& NotesTrack : LinkedMidiData.Tracks)
+	{
+		FMidiTrackVisualizationData TrackVisData;
+		TrackVisData.bIsVisible = true;
+		
+		// Use seeded random color for consistency across reloads
+		const UMidiExtensionsDevSettings* DevSettings = GetDefault<UMidiExtensionsDevSettings>();
+		if (DevSettings && DevSettings->DefaultTrackColors.IsValidIndex(i++))
+		{
+			TrackVisData.TrackColor = DevSettings->DefaultTrackColors[i++];
+		}
+		else
+		{
+			TrackVisData.TrackColor = FLinearColor::IntToDistinctColor(VisualizationData.TrackVisualizations.Num());
+		}
+		
+		TrackVisData.TrackName = FName(*NotesTrack.TrackName);
+		TrackVisData.TrackIndex = NotesTrack.TrackIndex;
+		TrackVisData.ChannelIndex = NotesTrack.ChannelIndex;
+		VisualizationData.TrackVisualizations.Add(TrackVisData);
+		i++;
+	}
 
 	return VisualizationData;
 }

@@ -13,8 +13,9 @@ void UMidiPianoroll::SetMidiFile(UMidiFile* InMidiFile)
         if (LinkedMidiFile)
         {
             TSharedPtr<FSongMaps, ESPMode::ThreadSafe> SongsMap = MakeShared<FSongMaps, ESPMode::ThreadSafe>(*LinkedMidiFile->GetSongMaps());
-            PianorollWidget->SetMidiData(FMidiNotesData::BuildFromMidiFile(LinkedMidiFile), SongsMap);
-            VisualizationData = FMidiFileVisualizationData::BuildFromMidiFile(LinkedMidiFile);
+			auto MidiData = FMidiNotesData::BuildFromMidiFile(LinkedMidiFile);
+            PianorollWidget->SetMidiData(MidiData, SongsMap);
+            VisualizationData = FMidiFileVisualizationData::BuildFromLinkedMidiData(*MidiData);
         }
         else
         {

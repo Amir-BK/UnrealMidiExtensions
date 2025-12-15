@@ -9,6 +9,7 @@
 #include "MidiPianorollWidgetStyle.generated.h"
 
 class UMidiFile;
+struct FMidiNotesData;
 
 UENUM(BlueprintType)
 /** Grid point type for timeline markings */
@@ -84,6 +85,8 @@ struct MIDIWIDGETS_API FMidiFileVisualizationData
 
 
 	static FMidiFileVisualizationData BuildFromMidiFile(UMidiFile* MidiFile);
+
+	static FMidiFileVisualizationData BuildFromLinkedMidiData(FMidiNotesData& LinkedMidiData);
 
 	bool operator==(const FMidiFileVisualizationData& Other) const
 	{
