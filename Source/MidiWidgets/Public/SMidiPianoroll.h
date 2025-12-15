@@ -11,13 +11,7 @@
 #include "MidiPianorollWidgetStyle.h"
 #include "Misc/Optional.h"
 
-/** Grid point type for timeline markings */
-enum class EPianorollGridPointType : uint8
-{
-	Bar,
-	Beat,
-	Subdivision
-};
+
 
 /** Represents a single grid point on the timeline */
 struct FPianorollGridPoint
@@ -65,6 +59,8 @@ public:
 		SLATE_ATTRIBUTE(EMidiTrackTimeMode, TimeMode)
 		/** Height of the timeline bar at the top */
 		SLATE_ARGUMENT(float, TimelineHeight)
+		/** Grid point type */
+		SLATE_ATTRIBUTE(EPianorollGridPointType, GridPointType)
 	SLATE_END_ARGS()
 
 	SMidiPianoroll();
@@ -91,6 +87,8 @@ TSlateAttribute<FMidiFileVisualizationData> VisualizationData;
 	TSlateAttribute<FVector2D> Zoom;
 
 	TSlateAttribute<EMidiTrackTimeMode> TimeMode;
+
+	TSlateAttribute<EPianorollGridPointType> GridPointType;
 
 	/** Height of the timeline header */
 	float TimelineHeight = 25.0f;

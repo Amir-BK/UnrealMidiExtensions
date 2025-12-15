@@ -42,10 +42,11 @@ TSharedRef<SWidget> UMidiPianoroll::RebuildWidget()
         .LinkedSongsMap(SongsMap)
         // Bind to getter using lambda - will be called each frame during paint
         .VisualizationData(TAttribute<FMidiFileVisualizationData>::CreateLambda([this]() { return GetVisualizationData(); }))
-		.TimeMode(TAttribute<EMidiTrackTimeMode>::CreateLambda([this]() { return GetTimeDisplayMode(); }))
+        .TimeMode(TAttribute<EMidiTrackTimeMode>::CreateLambda([this]() { return GetTimeDisplayMode(); }))
         .PianorollStyle(&PianorollStyle)
         .Offset(FVector2D::ZeroVector)
-        .Zoom(FVector2D(1.0f, 1.0f));
+        .Zoom(FVector2D(1.0f, 1.0f))
+        .GridPointType(TAttribute<EPianorollGridPointType>::CreateLambda([this]() { return GetGridPointType(); }));
 
     return PianorollWidget.ToSharedRef();
 }

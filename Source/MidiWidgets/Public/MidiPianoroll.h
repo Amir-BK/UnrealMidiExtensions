@@ -26,6 +26,9 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "MIDI")
 	EMidiTrackTimeMode TimeDisplayMode = EMidiTrackTimeMode::TimeLinear;
 
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "MIDI")
+	EPianorollGridPointType GridPointType = EPianorollGridPointType::Subdivision;
+
 	UPROPERTY(EditAnywhere, Category = "Appearance")
 	FMidiPianorollStyle PianorollStyle;
 
@@ -36,6 +39,8 @@ public:
 	const FMidiFileVisualizationData& GetVisualizationData() { return VisualizationData; }
 
 	const EMidiTrackTimeMode GetTimeDisplayMode() const { return TimeDisplayMode; }
+
+	const EPianorollGridPointType GetGridPointType() const { return GridPointType; }
 
 	TSharedRef<SWidget> RebuildWidget() override;
 

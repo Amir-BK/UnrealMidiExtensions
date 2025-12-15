@@ -11,6 +11,15 @@
 class UMidiFile;
 
 UENUM(BlueprintType)
+/** Grid point type for timeline markings */
+enum class EPianorollGridPointType : uint8
+{
+	Bar,
+	Beat,
+	Subdivision
+};
+
+UENUM(BlueprintType)
 enum class EMidiTrackTimeMode : uint8
 {
 	TickLinear UMETA(DisplayName = "Tick Linear"),
@@ -69,7 +78,7 @@ struct MIDIWIDGETS_API FMidiFileVisualizationData
 {
 	GENERATED_BODY()
 
-	UPROPERTY(EditFixedSize, EditAnywhere, Category = "Appearance")
+	UPROPERTY(EditFixedSize, EditAnywhere, Category = "Appearance", meta = (TitleProperty = "TrackName"))
 	TArray<FMidiTrackVisualizationData> TrackVisualizations;
 
 

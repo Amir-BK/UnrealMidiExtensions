@@ -26,6 +26,7 @@ void SMidiPianoroll::PrivateRegisterAttributes(FSlateAttributeInitializer& Attri
 	SLATE_ADD_MEMBER_ATTRIBUTE_DEFINITION_WITH_NAME(AttributeInitializer, "Zoom", Zoom, EInvalidateWidgetReason::Paint);
 	SLATE_ADD_MEMBER_ATTRIBUTE_DEFINITION_WITH_NAME(AttributeInitializer, "VisualizationData", VisualizationData, EInvalidateWidgetReason::Paint);
 	SLATE_ADD_MEMBER_ATTRIBUTE_DEFINITION_WITH_NAME(AttributeInitializer, "TimeMode", TimeMode, EInvalidateWidgetReason::Paint);
+	SLATE_ADD_MEMBER_ATTRIBUTE_DEFINITION_WITH_NAME(AttributeInitializer, "GridPointType", GridPointType, EInvalidateWidgetReason::Paint);
 }
 
 SMidiPianoroll::SMidiPianoroll()
@@ -33,6 +34,7 @@ SMidiPianoroll::SMidiPianoroll()
 	, Zoom(*this, FVector2D(1.0f, 1.0f))
 	, VisualizationData(*this, FMidiFileVisualizationData())
 	, TimeMode(*this, EMidiTrackTimeMode::TimeLinear)
+	, GridPointType(*this, EPianorollGridPointType::Bar)
 {
 }
 
@@ -55,6 +57,7 @@ void SMidiPianoroll::Construct(const FArguments& InArgs)
 	Zoom.Assign(*this, InArgs._Zoom);
 	VisualizationData.Assign(*this, InArgs._VisualizationData);
 	TimeMode.Assign(*this, InArgs._TimeMode);
+	GridPointType.Assign(*this, InArgs._GridPointType);
 
 	ChildSlot
 	[
@@ -372,16 +375,27 @@ void SMidiPianoroll::RecalculateGrid(const FGeometry& AllottedGeometry) const
     const FVector2D LocalSize = AllottedGeometry.GetLocalSize();
     const FVector2D LocalZoom = Zoom.Get();
     const FVector2D LocalOffset = Offset.Get();
+    const EPianorollGridPointType CurrentGridType = GridPointType.Get();
     
     // Default values for when no song map is available
     int32 TicksPerBar = 1920; // Standard 4/4 at 480 PPQ
     int32 TicksPerBeat = 480;
+    int32 TicksPerSubdivision = 120; // 16th notes
+    int32 BeatsPerBar = 4;
     
     if (LinkedSongsMap.IsValid())
     {
         const FSongMaps& SongsMap = *LinkedSongsMap;
         TicksPerBar = SongsMap.SubdivisionToMidiTicks(EMidiClockSubdivisionQuantization::Bar, 0);
         TicksPerBeat = SongsMap.SubdivisionToMidiTicks(EMidiClockSubdivisionQuantization::Beat, 0);
+        TicksPerSubdivision = TicksPerBeat / 4; // Assuming 16th note subdivisions
+        
+        // Get time signature to determine beats per bar
+        const FTimeSignature* TimeSig = SongsMap.GetTimeSignatureAtTick(0);
+        if (TimeSig)
+        {
+            BeatsPerBar = TimeSig->Numerator;
+        }
     }
     
     // Calculate visible tick range
@@ -403,18 +417,60 @@ void SMidiPianoroll::RecalculateGrid(const FGeometry& AllottedGeometry) const
         DisplayBarNumber++;
     }
     
-    // Add grid points for visible bars
+    // Add grid points for visible bars and their contents
     while (BarTick <= VisibleEndTick && DisplayBarNumber <= 500)
     {
         if (ShouldShowBar(DisplayBarNumber, CurrentGridDensity))
         {
-            FPianorollGridPoint GridPoint;
-            GridPoint.Type = EPianorollGridPointType::Bar;
-            GridPoint.Bar = DisplayBarNumber;
-            GridPoint.Beat = 1;
-            GridPoint.Subdivision = 1;
+            // Always add bar grid points
+            FPianorollGridPoint BarGridPoint;
+            BarGridPoint.Type = EPianorollGridPointType::Bar;
+            BarGridPoint.Bar = DisplayBarNumber;
+            BarGridPoint.Beat = 1;
+            BarGridPoint.Subdivision = 1;
+            GridPoints.Add(static_cast<int32>(BarTick), BarGridPoint);
             
-            GridPoints.Add(static_cast<int32>(BarTick), GridPoint);
+            // Add beat grid points if requested
+            if (CurrentGridType == EPianorollGridPointType::Beat || 
+                (CurrentGridType == EPianorollGridPointType::Subdivision && CurrentGridDensity <= EPianorollGridDensity::Beats))
+            {
+                for (int32 BeatNum = 2; BeatNum <= BeatsPerBar; ++BeatNum)
+                {
+                    const double BeatTick = BarTick + (BeatNum - 1) * TicksPerBeat;
+                    if (BeatTick <= VisibleEndTick)
+                    {
+                        FPianorollGridPoint BeatGridPoint;
+                        BeatGridPoint.Type = EPianorollGridPointType::Beat;
+                        BeatGridPoint.Bar = DisplayBarNumber;
+                        BeatGridPoint.Beat = BeatNum;
+                        BeatGridPoint.Subdivision = 1;
+                        GridPoints.Add(static_cast<int32>(BeatTick), BeatGridPoint);
+                    }
+                }
+            }
+            
+            // Add subdivision grid points if requested and zoom allows
+            if (CurrentGridType == EPianorollGridPointType::Subdivision && 
+                CurrentGridDensity == EPianorollGridDensity::Subdivisions)
+            {
+                for (int32 BeatNum = 1; BeatNum <= BeatsPerBar; ++BeatNum)
+                {
+                    const double BeatStartTick = BarTick + (BeatNum - 1) * TicksPerBeat;
+                    for (int32 SubDiv = 2; SubDiv <= 4; ++SubDiv) // 16th notes (4 subdivisions per beat)
+                    {
+                        const double SubDivTick = BeatStartTick + (SubDiv - 1) * TicksPerSubdivision;
+                        if (SubDivTick <= VisibleEndTick && SubDivTick < BarTick + TicksPerBar)
+                        {
+                            FPianorollGridPoint SubDivGridPoint;
+                            SubDivGridPoint.Type = EPianorollGridPointType::Subdivision;
+                            SubDivGridPoint.Bar = DisplayBarNumber;
+                            SubDivGridPoint.Beat = BeatNum;
+                            SubDivGridPoint.Subdivision = SubDiv;
+                            GridPoints.Add(static_cast<int32>(SubDivTick), SubDivGridPoint);
+                        }
+                    }
+                }
+            }
         }
         
         // Move to next bar
