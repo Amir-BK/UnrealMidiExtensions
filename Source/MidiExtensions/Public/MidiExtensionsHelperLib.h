@@ -19,4 +19,7 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "MIDI Extensions|Utils")
 	static FMidiFileIterator MakeMidiFileIterator(FMidiNotesData MidiDataPtr);
+
+	UFUNCTION(BlueprintPure, Category = "MIDI Extensions|Utils")
+	static FMidiNotesData MakeMidiNotesData(class UMidiFile* MidiFile);
 };

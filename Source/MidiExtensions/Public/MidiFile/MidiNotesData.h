@@ -49,7 +49,7 @@ struct FMidiNotesTrack
 
 
 
-USTRUCT(BlueprintType)
+USTRUCT(BlueprintType, meta = (HasNativeMake = "/Script/MidiExtensions.MidiExtensionsHelperLib.MakeMidiNotesData"))
 struct MIDIEXTENSIONS_API FMidiNotesData
 {
     GENERATED_BODY()
@@ -58,6 +58,8 @@ struct MIDIEXTENSIONS_API FMidiNotesData
     TArray<FMidiNotesTrack> Tracks;
 
 	static TSharedPtr<FMidiNotesData> BuildFromMidiFile(class UMidiFile* MidiFile);
+
+
 };
 
 USTRUCT(BlueprintType, meta = (HasNativeMake = "/Script/MidiExtensions.MidiExtensionsHelperLib.MakeMidiFileIterator"))

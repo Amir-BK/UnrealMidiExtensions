@@ -7,3 +7,10 @@ FMidiFileIterator UMidiExtensionsHelperLib::MakeMidiFileIterator(FMidiNotesData 
 {
 	return FMidiFileIterator();
 }
+
+FMidiNotesData UMidiExtensionsHelperLib::MakeMidiNotesData(UMidiFile* MidiFile)
+{
+	auto MidiNotesData = FMidiNotesData::BuildFromMidiFile(MidiFile);
+
+	return *MidiNotesData;
+}
