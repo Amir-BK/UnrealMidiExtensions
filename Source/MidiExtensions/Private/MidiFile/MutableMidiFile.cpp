@@ -140,8 +140,16 @@ void UMutableMidiFile::ModifyNotes(const TArray<FNotesEditCallbackData>& NotesEd
 	// Sort all tracks after batch modifications
 	SortAllTracks();
 
-	// Invalidate renderable copy to force regeneration
-	RenderableCopyOfMidiFileData = nullptr;
+	// Update the renderable copy in-place if it exists, so existing audio proxies see the changes immediately
+	// If it doesn't exist, it will be created on next CreateProxyData call with the updated data
+	if (RenderableCopyOfMidiFileData.IsValid())
+	{
+		// Copy the modified data to the renderable copy in-place
+		*RenderableCopyOfMidiFileData = TheMidiData;
+	}
+
+	// Mark the object as modified so Unreal knows to save it
+	Modify();
 
 	// Broadcast change notification
 	OnMutableMidiFileChanged.Broadcast();
