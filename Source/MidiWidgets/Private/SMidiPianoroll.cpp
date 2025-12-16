@@ -262,9 +262,59 @@ int32 SMidiPianoroll::OnPaint(const FPaintArgs& Args, const FGeometry& AllottedG
 }
 FReply SMidiPianoroll::OnMouseMove(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent)
 {
+    const FVector2D LocalMousePos = MyGeometry.AbsoluteToLocal(MouseEvent.GetScreenSpacePosition());
+    
+    // Handle note dragging
+    if (bIsDraggingNotes && bIsEditable)
+    {
+        // Calculate the delta in ticks and note numbers
+        const int32 CurrentTick = SnapTickToGrid(static_cast<int32>(PixelToTick(LocalMousePos.X)));
+        const int32 CurrentNoteNumber = ScreenYToNoteNumber(LocalMousePos.Y, MyGeometry);
+        
+        const int32 DeltaTicks = CurrentTick - DragStartTick;
+        const int32 DeltaNotes = CurrentNoteNumber - DragStartNoteNumber;
+        
+        // Only update if there's actual movement
+        if (DeltaTicks != 0 || DeltaNotes != 0)
+        {
+            // Build edit operations for all selected notes
+            TArray<FNotesEditCallbackData> Edits;
+            
+            for (const FNoteIdentifier& NoteId : SelectedNotes)
+            {
+                if (LinkedMidiData.IsValid() && 
+                    LinkedMidiData->Tracks.IsValidIndex(NoteId.TrackIndex) &&
+                    LinkedMidiData->Tracks[NoteId.TrackIndex].Notes.IsValidIndex(NoteId.NoteIndex))
+                {
+                    const FLinkedMidiNote& OriginalNote = LinkedMidiData->Tracks[NoteId.TrackIndex].Notes[NoteId.NoteIndex];
+                    
+                    FNotesEditCallbackData Edit;
+                    Edit.TrackIndex = NoteId.TrackIndex;
+                    Edit.NoteIndex = NoteId.NoteIndex;
+                    Edit.NoteData = OriginalNote;
+                    Edit.NoteData.NoteOnTick = FMath::Max(0, OriginalNote.NoteOnTick + DeltaTicks);
+                    Edit.NoteData.NoteOffTick = FMath::Max(Edit.NoteData.NoteOnTick + 1, OriginalNote.NoteOffTick + DeltaTicks);
+                    Edit.NoteData.NoteNumber = FMath::Clamp(OriginalNote.NoteNumber + DeltaNotes, 0, 127);
+                    Edit.bDelete = false;
+                    Edits.Add(Edit);
+                }
+            }
+            
+            if (Edits.Num() > 0 && OnNotesModified.IsBound())
+            {
+                OnNotesModified.Execute(Edits);
+                // Update drag start to current position for continuous dragging
+                DragStartTick = CurrentTick;
+                DragStartNoteNumber = CurrentNoteNumber;
+            }
+        }
+        
+        return FReply::Handled();
+    }
+    
     if (bIsMarqueeSelecting)
     {
-        MarqueeCurrentPos = MyGeometry.AbsoluteToLocal(MouseEvent.GetScreenSpacePosition());
+        MarqueeCurrentPos = LocalMousePos;
         // Force repaint to show marquee
         return FReply::Handled();
     }
@@ -295,18 +345,105 @@ FReply SMidiPianoroll::OnMouseButtonDown(const FGeometry& MyGeometry, const FPoi
 {
 	if (MouseEvent.GetEffectingButton() == EKeys::LeftMouseButton && bIsEditable)
     {
-        // Start marquee selection
-        bIsMarqueeSelecting = true;
-        MarqueeStartPos = MyGeometry.AbsoluteToLocal(MouseEvent.GetScreenSpacePosition());
-        MarqueeCurrentPos = MarqueeStartPos;
+        const FVector2D LocalMousePos = MyGeometry.AbsoluteToLocal(MouseEvent.GetScreenSpacePosition());
+        const EPianorollEditMode CurrentEditMode = EditMode.Get();
         
-        // Clear previous selection if not holding Shift
-        if (!MouseEvent.IsShiftDown())
+        // Check if we're in Paint mode
+        if (CurrentEditMode == EPianorollEditMode::Paint)
         {
-            SelectedNotes.Empty();
+            // Paint a new note at the click position
+            const int32 ClickTick = SnapTickToGrid(static_cast<int32>(PixelToTick(LocalMousePos.X)));
+            const int32 ClickNoteNumber = ScreenYToNoteNumber(LocalMousePos.Y, MyGeometry);
+            
+            // Get the track to paint on
+            const int32 TargetTrackIndex = EditingTrackIndex.Get();
+            
+            if (LinkedMidiData.IsValid() && TargetTrackIndex >= 0 && TargetTrackIndex < LinkedMidiData->Tracks.Num())
+            {
+                // Create a new note
+                FLinkedMidiNote NewNote;
+                NewNote.NoteOnTick = ClickTick;
+                NewNote.NoteOffTick = ClickTick + DefaultNoteDurationTicks.Get();
+                NewNote.NoteNumber = ClickNoteNumber;
+                NewNote.Velocity = DefaultNoteVelocity.Get();
+                
+                // Create an edit to add the note (use an invalid index to signal addition)
+                FNotesEditCallbackData Edit;
+                Edit.TrackIndex = TargetTrackIndex;
+                Edit.NoteIndex = LinkedMidiData->Tracks[TargetTrackIndex].Notes.Num(); // Add at end
+                Edit.NoteData = NewNote;
+                Edit.bDelete = false;
+                
+                TArray<FNotesEditCallbackData> Edits;
+                Edits.Add(Edit);
+                
+                if (OnNotesModified.IsBound())
+                {
+                    OnNotesModified.Execute(Edits);
+                }
+                
+                bIsPainting = true;
+                return FReply::Handled().CaptureMouse(SharedThis(this));
+            }
         }
-        
-        return FReply::Handled().CaptureMouse(SharedThis(this));
+        else // Select mode
+        {
+            // Check if clicking on an existing note
+            int32 ClickedTrackIndex = INDEX_NONE;
+            int32 ClickedNoteIndex = INDEX_NONE;
+            
+            if (FindNoteAtPosition(LocalMousePos, MyGeometry, ClickedTrackIndex, ClickedNoteIndex))
+            {
+                // Clicked on a note
+                FNoteIdentifier ClickedNoteId;
+                ClickedNoteId.TrackIndex = ClickedTrackIndex;
+                ClickedNoteId.NoteIndex = ClickedNoteIndex;
+                
+                if (MouseEvent.IsShiftDown())
+                {
+                    // Toggle selection
+                    if (SelectedNotes.Contains(ClickedNoteId))
+                    {
+                        SelectedNotes.Remove(ClickedNoteId);
+                    }
+                    else
+                    {
+                        SelectedNotes.Add(ClickedNoteId);
+                    }
+                }
+                else if (!SelectedNotes.Contains(ClickedNoteId))
+                {
+                    // Select only this note if not already selected
+                    SelectedNotes.Empty();
+                    SelectedNotes.Add(ClickedNoteId);
+                }
+                
+                // Start dragging if we have a selection
+                if (SelectedNotes.Num() > 0)
+                {
+                    bIsDraggingNotes = true;
+                    DragStartPos = LocalMousePos;
+                    DragStartTick = SnapTickToGrid(static_cast<int32>(PixelToTick(LocalMousePos.X)));
+                    DragStartNoteNumber = ScreenYToNoteNumber(LocalMousePos.Y, MyGeometry);
+                    return FReply::Handled().CaptureMouse(SharedThis(this));
+                }
+            }
+            else
+            {
+                // Clicked on empty space - start marquee selection
+                bIsMarqueeSelecting = true;
+                MarqueeStartPos = LocalMousePos;
+                MarqueeCurrentPos = MarqueeStartPos;
+                
+                // Clear previous selection if not holding Shift
+                if (!MouseEvent.IsShiftDown())
+                {
+                    SelectedNotes.Empty();
+                }
+                
+                return FReply::Handled().CaptureMouse(SharedThis(this));
+            }
+        }
     }
 
     if (MouseEvent.GetEffectingButton() == EKeys::RightMouseButton)
@@ -321,6 +458,18 @@ FReply SMidiPianoroll::OnMouseButtonUp(const FGeometry& MyGeometry, const FPoint
 {
     if (MouseEvent.GetEffectingButton() == EKeys::LeftMouseButton)
     {
+        if (bIsDraggingNotes)
+        {
+            bIsDraggingNotes = false;
+            return FReply::Handled().ReleaseMouseCapture();
+        }
+        
+        if (bIsPainting)
+        {
+            bIsPainting = false;
+            return FReply::Handled().ReleaseMouseCapture();
+        }
+        
         if (bIsMarqueeSelecting)
         {
             // Calculate selection bounds in content space
@@ -398,7 +547,17 @@ FReply SMidiPianoroll::OnMouseWheel(const FGeometry& MyGeometry, const FPointerE
 }
 TOptional<EMouseCursor::Type> SMidiPianoroll::GetCursor() const
 {
+    if (bIsDraggingNotes)
+    {
+        return EMouseCursor::GrabHandClosed;
+    }
+    
     if (bIsMarqueeSelecting)
+    {
+        return EMouseCursor::Crosshairs;
+    }
+    
+    if (bIsPainting)
     {
         return EMouseCursor::Crosshairs;
     }
@@ -410,6 +569,16 @@ TOptional<EMouseCursor::Type> SMidiPianoroll::GetCursor() const
             return EMouseCursor::GrabHandClosed;
         }
 		return EMouseCursor::GrabHand;
+    }
+    
+    // Show different cursor based on edit mode
+    if (bIsEditable)
+    {
+        const EPianorollEditMode CurrentEditMode = EditMode.Get();
+        if (CurrentEditMode == EPianorollEditMode::Paint)
+        {
+            return EMouseCursor::Crosshairs;
+        }
     }
 
 	return EMouseCursor::Default;

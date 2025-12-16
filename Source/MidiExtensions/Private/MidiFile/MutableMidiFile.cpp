@@ -172,6 +172,11 @@ void UMutableMidiFile::RemoveNoteEventsFromTrack(FMidiTrack* Track, const FLinke
 		const FMidiEvent& Event = Events[i];
 		const FMidiMsg& Msg = Event.GetMsg();
 		
+		if(Msg.IsStd() == false)
+		{
+			continue;
+		}
+
 		if (Msg.GetStdChannel() != Channel)
 		{
 			continue;

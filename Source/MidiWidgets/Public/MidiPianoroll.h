@@ -66,6 +66,9 @@ public:
 	UFUNCTION(CallInEditor, BlueprintCallable, Category = "MIDI")
 	void MakeEditableCopyOfLinkedMidiFile();
 
+	UFUNCTION(CallInEditor, BlueprintCallable, Category = "MIDI")
+	void SaveMidiFileToAsset();
+
 	/** Delete all currently selected notes */
 	UFUNCTION(BlueprintCallable, Category = "MIDI|Editing")
 	void DeleteSelectedNotes();

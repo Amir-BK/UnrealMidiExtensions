@@ -11,7 +11,7 @@ void UMidiPianoroll::SetMidiFile(UMidiFile* InMidiFile)
     LinkedMidiFile = InMidiFile;
     
     // Auto-enable editable mode if the file is a MutableMidiFile
-    bool bIsMutable = Cast<UMutableMidiFile>(LinkedMidiFile) != nullptr;
+	bool bIsMutable = LinkedMidiFile->IsA<UMutableMidiFile>();
     
     if (PianorollWidget.IsValid())
     {
@@ -44,6 +44,11 @@ void UMidiPianoroll::MakeEditableCopyOfLinkedMidiFile()
 		SetMidiFile(MutableCopy);
 		// SetMidiFile will auto-enable editable since it's now a MutableMidiFile
     }
+}
+
+void UMidiPianoroll::SaveMidiFileToAsset()
+{
+	SaveMidiFileAsAsset(TEXT("/Game/MIDI"), LinkedMidiFile ? LinkedMidiFile->GetName() + TEXT("_Saved") : TEXT("NewMidiFile"));
 }
 
 void UMidiPianoroll::SetEditingTrackIndex(int32 InTrackIndex)
