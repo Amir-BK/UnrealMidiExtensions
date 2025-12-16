@@ -11,6 +11,8 @@
 #include "MidiPianorollWidgetStyle.h"
 #include "Misc/Optional.h"
 
+struct FNotesEditCallbackData;
+
 
 
 /** Represents a single grid point on the timeline */
@@ -61,6 +63,14 @@ public:
 		SLATE_ARGUMENT(float, TimelineHeight)
 		/** Grid point type */
 		SLATE_ATTRIBUTE(EPianorollGridPointType, GridPointType)
+		/** Edit mode (select or paint) */
+		SLATE_ATTRIBUTE(EPianorollEditMode, EditMode)
+		/** Track index to edit (for painting) - use -1 for any visible track */
+		SLATE_ATTRIBUTE(int32, EditingTrackIndex)
+		/** Default velocity for painted notes */
+		SLATE_ATTRIBUTE(int32, DefaultNoteVelocity)
+		/** Default duration in ticks for painted notes */
+		SLATE_ATTRIBUTE(int32, DefaultNoteDurationTicks)
 		/** Is file editable (support selection, moving notes, etc.) */
 		SLATE_ARGUMENT_DEFAULT(bool, bIsEditable) { false };
 	SLATE_END_ARGS()
@@ -92,6 +102,14 @@ TSlateAttribute<FMidiFileVisualizationData> VisualizationData;
 
 	TSlateAttribute<EPianorollGridPointType> GridPointType;
 
+	TSlateAttribute<EPianorollEditMode> EditMode;
+
+	TSlateAttribute<int32> EditingTrackIndex;
+
+	TSlateAttribute<int32> DefaultNoteVelocity;
+
+	TSlateAttribute<int32> DefaultNoteDurationTicks;
+
 	bool bIsEditable;
 
 	/** Height of the timeline header */
@@ -104,6 +122,12 @@ TSlateAttribute<FMidiFileVisualizationData> VisualizationData;
 	mutable EPianorollGridDensity CurrentGridDensity = EPianorollGridDensity::Bars;
 
 public:
+
+	void SetIsEditable(bool bInIsEditable)
+	{
+		bIsEditable = bInIsEditable;
+	}
+
 	//SWidget interface
     virtual FReply OnMouseMove(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override;
 
@@ -131,9 +155,20 @@ bool bIsRightMouseButtonDown = false;
 bool bIsZooming = false;
 
 // Marquee selection
-bool bIsMarqueeSelecting;
+bool bIsMarqueeSelecting = false;
 FVector2D MarqueeStartPos;
 FVector2D MarqueeCurrentPos;
+
+// Note dragging state
+bool bIsDraggingNotes = false;
+FVector2D DragStartPos;
+int32 DragStartTick = 0;
+int32 DragStartNoteNumber = 0;
+
+// Painting state
+bool bIsPainting = false;
+
+
 	
 // Selected notes identified by track index and note index
 struct FNoteIdentifier
@@ -189,4 +224,32 @@ TSet<FNoteIdentifier> SelectedNotes;
 
 	/** Checks if a note is currently selected */
 	bool IsNoteSelected(int32 TrackIndex, int32 NoteIndex) const;
+
+	/** Converts a screen Y position to a MIDI note number */
+	int32 ScreenYToNoteNumber(float ScreenY, const FGeometry& AllottedGeometry) const;
+
+	/** Finds a note at the given screen position, returns true if found */
+	bool FindNoteAtPosition(const FVector2D& ScreenPos, const FGeometry& AllottedGeometry, int32& OutTrackIndex, int32& OutNoteIndex) const;
+
+	/** Snaps a tick to the nearest grid point */
+	int32 SnapTickToGrid(int32 Tick) const;
+
+public:
+	/** Gets the current selected notes */
+	const TSet<FNoteIdentifier>& GetSelectedNotes() const { return SelectedNotes; }
+
+	/** Clears all selected notes */
+	void ClearSelection() { SelectedNotes.Empty(); }
+
+	/** Delegate called when notes need to be modified */
+	DECLARE_DELEGATE_OneParam(FOnNotesModified, const TArray<struct FNotesEditCallbackData>&);
+	FOnNotesModified OnNotesModified;
+
+	/** Delegate called when selected notes should be deleted */
+	DECLARE_DELEGATE(FOnDeleteSelectedNotes);
+	FOnDeleteSelectedNotes OnDeleteSelectedNotes;
+
+	virtual FReply OnKeyDown(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent) override;
+
+	virtual bool SupportsKeyboardFocus() const override { return true; }
 };

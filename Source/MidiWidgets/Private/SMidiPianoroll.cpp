@@ -6,6 +6,7 @@
 #include "Rendering/DrawElements.h"
 #include "Styling/CoreStyle.h"
 #include "Styling/AppStyle.h"
+#include "MidiFile/MutableMidiFile.h"
 
 
 namespace
@@ -27,6 +28,10 @@ void SMidiPianoroll::PrivateRegisterAttributes(FSlateAttributeInitializer& Attri
 	SLATE_ADD_MEMBER_ATTRIBUTE_DEFINITION_WITH_NAME(AttributeInitializer, "VisualizationData", VisualizationData, EInvalidateWidgetReason::Paint);
 	SLATE_ADD_MEMBER_ATTRIBUTE_DEFINITION_WITH_NAME(AttributeInitializer, "TimeMode", TimeMode, EInvalidateWidgetReason::Paint);
 	SLATE_ADD_MEMBER_ATTRIBUTE_DEFINITION_WITH_NAME(AttributeInitializer, "GridPointType", GridPointType, EInvalidateWidgetReason::Paint);
+	SLATE_ADD_MEMBER_ATTRIBUTE_DEFINITION_WITH_NAME(AttributeInitializer, "EditMode", EditMode, EInvalidateWidgetReason::Paint);
+	SLATE_ADD_MEMBER_ATTRIBUTE_DEFINITION_WITH_NAME(AttributeInitializer, "EditingTrackIndex", EditingTrackIndex, EInvalidateWidgetReason::Paint);
+	SLATE_ADD_MEMBER_ATTRIBUTE_DEFINITION_WITH_NAME(AttributeInitializer, "DefaultNoteVelocity", DefaultNoteVelocity, EInvalidateWidgetReason::None);
+	SLATE_ADD_MEMBER_ATTRIBUTE_DEFINITION_WITH_NAME(AttributeInitializer, "DefaultNoteDurationTicks", DefaultNoteDurationTicks, EInvalidateWidgetReason::None);
 }
 
 SMidiPianoroll::SMidiPianoroll()
@@ -35,6 +40,10 @@ SMidiPianoroll::SMidiPianoroll()
 	, VisualizationData(*this, FMidiFileVisualizationData())
 	, TimeMode(*this, EMidiTrackTimeMode::TimeLinear)
 	, GridPointType(*this, EPianorollGridPointType::Bar)
+	, EditMode(*this, EPianorollEditMode::Select)
+	, EditingTrackIndex(*this, 0)
+	, DefaultNoteVelocity(*this, 100)
+	, DefaultNoteDurationTicks(*this, 480)
 {
 }
 
@@ -59,6 +68,10 @@ void SMidiPianoroll::Construct(const FArguments& InArgs)
 	VisualizationData.Assign(*this, InArgs._VisualizationData);
 	TimeMode.Assign(*this, InArgs._TimeMode);
 	GridPointType.Assign(*this, InArgs._GridPointType);
+	EditMode.Assign(*this, InArgs._EditMode);
+	EditingTrackIndex.Assign(*this, InArgs._EditingTrackIndex);
+	DefaultNoteVelocity.Assign(*this, InArgs._DefaultNoteVelocity);
+	DefaultNoteDurationTicks.Assign(*this, InArgs._DefaultNoteDurationTicks);
 
 	ChildSlot
 	[
@@ -871,6 +884,192 @@ bool SMidiPianoroll::IsNoteSelected(int32 TrackIndex, int32 NoteIndex) const
     NoteId.TrackIndex = TrackIndex;
     NoteId.NoteIndex = NoteIndex;
     return SelectedNotes.Contains(NoteId);
+}
+
+int32 SMidiPianoroll::ScreenYToNoteNumber(float ScreenY, const FGeometry& AllottedGeometry) const
+{
+    const FVector2D LocalOffset = Offset.Get();
+    const FVector2D LocalZoom = Zoom.Get();
+    const float ContentStartY = TimelineHeight;
+    const float RowH = 10.0f * LocalZoom.Y;
+    const float RowSpacing = RowH + 2.0f;
+    
+    // Convert screen Y to content Y
+    const float ContentY = ScreenY + LocalOffset.Y - ContentStartY;
+    
+    // Calculate which row we're in
+    const int32 RowIndex = FMath::FloorToInt(ContentY / RowSpacing);
+    
+    // Convert row index to note number (127 - row because notes are drawn top-down)
+    const int32 NoteNumber = FMath::Clamp(127 - RowIndex, 0, 127);
+    
+    return NoteNumber;
+}
+
+bool SMidiPianoroll::FindNoteAtPosition(const FVector2D& ScreenPos, const FGeometry& AllottedGeometry, int32& OutTrackIndex, int32& OutNoteIndex) const
+{
+    if (!LinkedMidiData.IsValid())
+    {
+        return false;
+    }
+    
+    const FVector2D LocalOffset = Offset.Get();
+    const FVector2D LocalZoom = Zoom.Get();
+    const float ContentStartY = TimelineHeight;
+    const float RowH = 10.0f * LocalZoom.Y;
+    
+    const FMidiFileVisualizationData& VisData = VisualizationData.Get();
+    
+    // Search through all tracks and notes
+    for (int32 TrackIdx = 0; TrackIdx < LinkedMidiData->Tracks.Num(); ++TrackIdx)
+    {
+        const FMidiNotesTrack& Track = LinkedMidiData->Tracks[TrackIdx];
+        
+        // Check track visibility
+        int32 IndexOfTrackVis = VisData.TrackVisualizations.IndexOfByPredicate([&Track](const FMidiTrackVisualizationData& Data)
+        {
+            return Data.TrackIndex == Track.TrackIndex && Data.ChannelIndex == Track.ChannelIndex;
+        });
+        
+        if (IndexOfTrackVis == INDEX_NONE)
+        {
+            IndexOfTrackVis = VisData.TrackVisualizations.IndexOfByPredicate([&Track](const FMidiTrackVisualizationData& Data)
+            {
+                return Data.TrackIndex == Track.TrackIndex;
+            });
+        }
+        
+        const FMidiTrackVisualizationData* Vis = (IndexOfTrackVis != INDEX_NONE) 
+            ? &VisData.TrackVisualizations[IndexOfTrackVis] 
+            : nullptr;
+            
+        if (Vis && !Vis->bIsVisible)
+        {
+            continue;
+        }
+        
+        for (int32 NoteIdx = 0; NoteIdx < Track.Notes.Num(); ++NoteIdx)
+        {
+            const FLinkedMidiNote& Note = Track.Notes[NoteIdx];
+            
+            const float NoteX = TickToPixel(Note.NoteOnTick) - LocalOffset.X;
+            const float NoteEndX = TickToPixel(Note.NoteOffTick) - LocalOffset.X;
+            const float NoteY = ContentStartY + (127 - Note.NoteNumber) * (RowH + 2.0f) - LocalOffset.Y;
+            
+            if (ScreenPos.X >= NoteX && ScreenPos.X <= NoteEndX &&
+                ScreenPos.Y >= NoteY && ScreenPos.Y <= NoteY + RowH)
+            {
+                OutTrackIndex = TrackIdx;
+                OutNoteIndex = NoteIdx;
+                return true;
+            }
+        }
+    }
+    
+    return false;
+}
+
+int32 SMidiPianoroll::SnapTickToGrid(int32 Tick) const
+{
+    if (!LinkedSongsMap.IsValid())
+    {
+        // Default snap to 16th notes at 480 PPQ
+        const int32 SnapInterval = 120;
+        return FMath::RoundToInt((float)Tick / SnapInterval) * SnapInterval;
+    }
+    
+    const EPianorollGridPointType CurrentGridType = GridPointType.Get();
+    int32 SnapInterval = 480; // Default to beat
+    
+    switch (CurrentGridType)
+    {
+    case EPianorollGridPointType::Bar:
+        SnapInterval = LinkedSongsMap->SubdivisionToMidiTicks(EMidiClockSubdivisionQuantization::Bar, 0);
+        break;
+    case EPianorollGridPointType::Beat:
+        SnapInterval = LinkedSongsMap->SubdivisionToMidiTicks(EMidiClockSubdivisionQuantization::Beat, 0);
+        break;
+    case EPianorollGridPointType::Subdivision:
+        // Use 16th notes
+        SnapInterval = LinkedSongsMap->SubdivisionToMidiTicks(EMidiClockSubdivisionQuantization::Beat, 0) / 4;
+        break;
+    }
+    
+    return FMath::RoundToInt((float)Tick / SnapInterval) * SnapInterval;
+}
+
+FReply SMidiPianoroll::OnKeyDown(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent)
+{
+    if (!bIsEditable)
+    {
+        return FReply::Unhandled();
+    }
+    
+    // Handle Delete key to delete selected notes
+    if (InKeyEvent.GetKey() == EKeys::Delete || InKeyEvent.GetKey() == EKeys::BackSpace)
+    {
+        if (SelectedNotes.Num() > 0 && OnDeleteSelectedNotes.IsBound())
+        {
+            OnDeleteSelectedNotes.Execute();
+            return FReply::Handled();
+        }
+    }
+    
+    // Handle Escape to clear selection
+    if (InKeyEvent.GetKey() == EKeys::Escape)
+    {
+        SelectedNotes.Empty();
+        return FReply::Handled();
+    }
+    
+    // Handle Ctrl+A to select all visible notes
+    if (InKeyEvent.GetKey() == EKeys::A && InKeyEvent.IsControlDown())
+    {
+        if (LinkedMidiData.IsValid())
+        {
+            SelectedNotes.Empty();
+            const FMidiFileVisualizationData& VisData = VisualizationData.Get();
+            
+            for (int32 TrackIdx = 0; TrackIdx < LinkedMidiData->Tracks.Num(); ++TrackIdx)
+            {
+                const FMidiNotesTrack& Track = LinkedMidiData->Tracks[TrackIdx];
+                
+                // Check visibility
+                int32 IndexOfTrackVis = VisData.TrackVisualizations.IndexOfByPredicate([&Track](const FMidiTrackVisualizationData& Data)
+                {
+                    return Data.TrackIndex == Track.TrackIndex && Data.ChannelIndex == Track.ChannelIndex;
+                });
+                
+                if (IndexOfTrackVis == INDEX_NONE)
+                {
+                    IndexOfTrackVis = VisData.TrackVisualizations.IndexOfByPredicate([&Track](const FMidiTrackVisualizationData& Data)
+                    {
+                        return Data.TrackIndex == Track.TrackIndex;
+                    });
+                }
+                
+                const FMidiTrackVisualizationData* Vis = (IndexOfTrackVis != INDEX_NONE) 
+                    ? &VisData.TrackVisualizations[IndexOfTrackVis] 
+                    : nullptr;
+                    
+                if (Vis && !Vis->bIsVisible)
+                {
+                    continue;
+                }
+                
+                for (int32 NoteIdx = 0; NoteIdx < Track.Notes.Num(); ++NoteIdx)
+                {
+                    FNoteIdentifier NoteId;
+                    NoteId.TrackIndex = TrackIdx;
+                    NoteId.NoteIndex = NoteIdx;
+                    SelectedNotes.Add(NoteId);
+                }
+            }
+            return FReply::Handled();
+        }
+    }
+    
+    return FReply::Unhandled();
 }
 
 END_SLATE_FUNCTION_BUILD_OPTIMIZATION

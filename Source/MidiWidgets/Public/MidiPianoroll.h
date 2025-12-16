@@ -29,11 +29,62 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "MIDI")
 	EPianorollGridPointType GridPointType = EPianorollGridPointType::Subdivision;
 
+	/** The track index to edit when in paint mode. Set to -1 to allow editing any visible track. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "MIDI|Editing", BlueprintSetter = SetEditingTrackIndex, meta = (ClampMin = "-1"))
+	int32 EditingTrackIndex = 0;
+
+	/** The current edit mode for the piano roll */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "MIDI|Editing", BlueprintSetter = SetEditMode)
+	EPianorollEditMode EditMode = EPianorollEditMode::Select;
+
+	/** Default velocity for painted notes (0-127) */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "MIDI|Editing", BlueprintSetter = SetDefaultNoteVelocity, meta = (ClampMin = "1", ClampMax = "127"))
+	int32 DefaultNoteVelocity = 100;
+
+	/** Default note duration in ticks for painted notes */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "MIDI|Editing", BlueprintSetter = SetDefaultNoteDurationTicks, meta = (ClampMin = "1"))
+	int32 DefaultNoteDurationTicks = 480;
+
 	UPROPERTY(EditAnywhere, Category = "Appearance")
 	FMidiPianorollStyle PianorollStyle;
 
 	UFUNCTION(BlueprintSetter)
 	void SetMidiFile(UMidiFile* InMidiFile);
+
+	UFUNCTION(BlueprintSetter)
+	void SetEditingTrackIndex(int32 InTrackIndex);
+
+	UFUNCTION(BlueprintSetter)
+	void SetEditMode(EPianorollEditMode InEditMode);
+
+	UFUNCTION(BlueprintSetter)
+	void SetDefaultNoteVelocity(int32 InVelocity);
+
+	UFUNCTION(BlueprintSetter)
+	void SetDefaultNoteDurationTicks(int32 InDurationTicks);
+
+	UFUNCTION(CallInEditor, BlueprintCallable, Category = "MIDI")
+	void MakeEditableCopyOfLinkedMidiFile();
+
+	/** Delete all currently selected notes */
+	UFUNCTION(BlueprintCallable, Category = "MIDI|Editing")
+	void DeleteSelectedNotes();
+
+	/** Clear the current note selection */
+	UFUNCTION(BlueprintCallable, Category = "MIDI|Editing")
+	void ClearSelection();
+
+	/** Get the number of currently selected notes */
+	UFUNCTION(BlueprintCallable, Category = "MIDI|Editing")
+	int32 GetSelectedNoteCount() const;
+
+	/** Check if the piano roll is in editable mode */
+	UFUNCTION(BlueprintCallable, Category = "MIDI|Editing")
+	bool IsEditable() const;
+
+	/** Save the current MIDI file as a new asset */
+	UFUNCTION(BlueprintCallable, Category = "MIDI")
+	class UMidiFile* SaveMidiFileAsAsset(const FString& PackagePath, const FString& AssetName);
 
 	// Getter for attribute binding
 	const FMidiFileVisualizationData& GetVisualizationData() { return VisualizationData; }
@@ -41,6 +92,14 @@ public:
 	const EMidiTrackTimeMode GetTimeDisplayMode() const { return TimeDisplayMode; }
 
 	const EPianorollGridPointType GetGridPointType() const { return GridPointType; }
+
+	int32 GetEditingTrackIndex() const { return EditingTrackIndex; }
+
+	EPianorollEditMode GetEditMode() const { return EditMode; }
+
+	int32 GetDefaultNoteVelocity() const { return DefaultNoteVelocity; }
+
+	int32 GetDefaultNoteDurationTicks() const { return DefaultNoteDurationTicks; }
 
 	TSharedRef<SWidget> RebuildWidget() override;
 
