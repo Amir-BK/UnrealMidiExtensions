@@ -29,21 +29,28 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "MIDI")
 	EPianorollGridPointType GridPointType = EPianorollGridPointType::Subdivision;
 
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "MIDI")
+	EMidiClockSubdivisionQuantization GridSubdivision = EMidiClockSubdivisionQuantization::SixteenthNote;
+
 	/** The track index to edit when in paint mode. Set to -1 to allow editing any visible track. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "MIDI|Editing", BlueprintSetter = SetEditingTrackIndex, meta = (ClampMin = "-1"))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "MIDI|Editing", BlueprintSetter = SetEditingTrackIndex, meta = (ClampMin = "-1", EditCondition = "IsEditable"))
 	int32 EditingTrackIndex = 0;
 
 	/** The current edit mode for the piano roll */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "MIDI|Editing", BlueprintSetter = SetEditMode)
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "MIDI|Editing", BlueprintSetter = SetEditMode, meta=(EditCondition = "IsEditable"))
 	EPianorollEditMode EditMode = EPianorollEditMode::Select;
 
 	/** Default velocity for painted notes (0-127) */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "MIDI|Editing", BlueprintSetter = SetDefaultNoteVelocity, meta = (ClampMin = "1", ClampMax = "127"))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "MIDI|Editing", BlueprintSetter = SetDefaultNoteVelocity, meta = (ClampMin = "1", ClampMax = "127", EditCondition = "IsEditable"))
 	int32 DefaultNoteVelocity = 100;
 
 	/** Default note duration in ticks for painted notes */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "MIDI|Editing", BlueprintSetter = SetDefaultNoteDurationTicks, meta = (ClampMin = "1"))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "MIDI|Editing", BlueprintSetter = SetDefaultNoteDurationTicks, meta = (ClampMin = "1", EditCondition = "IsEditable"))
 	int32 DefaultNoteDurationTicks = 480;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "MIDI|Editing", meta = (EditCondition = "IsEditable"))
+
+	EMidiClockSubdivisionQuantization NoteGridSubdivision = EMidiClockSubdivisionQuantization::SixteenthNote;
 
 	UPROPERTY(EditAnywhere, Category = "Appearance")
 	FMidiPianorollStyle PianorollStyle;

@@ -11,7 +11,7 @@ void UMidiPianoroll::SetMidiFile(UMidiFile* InMidiFile)
     LinkedMidiFile = InMidiFile;
     
     // Auto-enable editable mode if the file is a MutableMidiFile
-	bool bIsMutable = LinkedMidiFile->IsA<UMutableMidiFile>();
+	const bool bIsMutable = LinkedMidiFile->IsA<UMutableMidiFile>();
     
     if (PianorollWidget.IsValid())
     {

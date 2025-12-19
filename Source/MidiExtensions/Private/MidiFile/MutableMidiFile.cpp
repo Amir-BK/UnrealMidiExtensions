@@ -26,12 +26,17 @@ void UMutableMidiFile::InitializeFromMidiFile(UMidiFile* SourceFile)
 	}
 
 	// Copy the base file's MIDI data using the proxy system
+	// This copies all data including tempo map, time signatures, and song length
 	Audio::FProxyDataInitParams InitParams{ TEXT("MutableMidiFile") };
 	auto ProxyData = SourceFile->CreateProxyData(InitParams);
 	TheMidiData = *StaticCastSharedPtr<FMidiFileProxy>(ProxyData)->GetMidiFile();
 
 	// Sort all tracks to ensure consistency
 	SortAllTracks();
+
+	// Scan tracks to ensure song length and maps are correctly set
+	// This is important because it finalizes the tempo map and other song data
+	ScanTracksForSongLengthChange();
 
 	// Build linked MIDI data for editing
 	LinkedMidiData = FMidiNotesData::BuildFromMidiFile(this);
@@ -139,6 +144,9 @@ void UMutableMidiFile::ModifyNotes(const TArray<FNotesEditCallbackData>& NotesEd
 
 	// Sort all tracks after batch modifications
 	SortAllTracks();
+
+	// Update song length in case notes were added beyond the current length
+	ScanTracksForSongLengthChange();
 
 	// Update the renderable copy in-place if it exists, so existing audio proxies see the changes immediately
 	// If it doesn't exist, it will be created on next CreateProxyData call with the updated data
