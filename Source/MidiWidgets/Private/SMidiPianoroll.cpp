@@ -32,6 +32,9 @@ void SMidiPianoroll::PrivateRegisterAttributes(FSlateAttributeInitializer& Attri
 	SLATE_ADD_MEMBER_ATTRIBUTE_DEFINITION_WITH_NAME(AttributeInitializer, "EditingTrackIndex", EditingTrackIndex, EInvalidateWidgetReason::Paint);
 	SLATE_ADD_MEMBER_ATTRIBUTE_DEFINITION_WITH_NAME(AttributeInitializer, "DefaultNoteVelocity", DefaultNoteVelocity, EInvalidateWidgetReason::None);
 	SLATE_ADD_MEMBER_ATTRIBUTE_DEFINITION_WITH_NAME(AttributeInitializer, "DefaultNoteDurationTicks", DefaultNoteDurationTicks, EInvalidateWidgetReason::None);
+	SLATE_ADD_MEMBER_ATTRIBUTE_DEFINITION_WITH_NAME(AttributeInitializer, "GridSubdivision", GridSubdivision, EInvalidateWidgetReason::Paint);
+	SLATE_ADD_MEMBER_ATTRIBUTE_DEFINITION_WITH_NAME(AttributeInitializer, "NoteSnapping", NoteSnapping, EInvalidateWidgetReason::None);
+	SLATE_ADD_MEMBER_ATTRIBUTE_DEFINITION_WITH_NAME(AttributeInitializer, "NoteDuration", NoteDuration, EInvalidateWidgetReason::None);
 }
 
 SMidiPianoroll::SMidiPianoroll()
@@ -44,6 +47,9 @@ SMidiPianoroll::SMidiPianoroll()
 	, EditingTrackIndex(*this, 0)
 	, DefaultNoteVelocity(*this, 100)
 	, DefaultNoteDurationTicks(*this, 480)
+	, GridSubdivision(*this, EMidiClockSubdivisionQuantization::SixteenthNote)
+	, NoteSnapping(*this, EMidiClockSubdivisionQuantization::SixteenthNote)
+	, NoteDuration(*this, EMidiClockSubdivisionQuantization::SixteenthNote)
 {
 }
 
@@ -72,6 +78,9 @@ void SMidiPianoroll::Construct(const FArguments& InArgs)
 	EditingTrackIndex.Assign(*this, InArgs._EditingTrackIndex);
 	DefaultNoteVelocity.Assign(*this, InArgs._DefaultNoteVelocity);
 	DefaultNoteDurationTicks.Assign(*this, InArgs._DefaultNoteDurationTicks);
+	GridSubdivision.Assign(*this, InArgs._GridSubdivision);
+	NoteSnapping.Assign(*this, InArgs._NoteSnapping);
+	NoteDuration.Assign(*this, InArgs._NoteDuration);
 
 	ChildSlot
 	[
@@ -255,7 +264,67 @@ int32 SMidiPianoroll::OnPaint(const FPaintArgs& Args, const FGeometry& AllottedG
         );
     }
 
-    // Layer 5: Paint timeline header (on top of everything)
+    // Layer 5: Draw preview note when in paint mode
+    if (bShowPreviewNote && bIsEditable && EditMode.Get() == EPianorollEditMode::Paint && LinkedMidiData.IsValid())
+    {
+        const int32 TargetTrackIndex = EditingTrackIndex.Get();
+        if (TargetTrackIndex >= 0 && TargetTrackIndex < LinkedMidiData->Tracks.Num())
+        {
+            // Get track color for preview
+            const FMidiFileVisualizationData& VisData = VisualizationData.Get();
+            const FMidiNotesTrack& Track = LinkedMidiData->Tracks[TargetTrackIndex];
+            FLinearColor PreviewColor = FLinearColor::White;
+            
+            int32 IndexOfTrackVis = VisData.TrackVisualizations.IndexOfByPredicate([&Track](const FMidiTrackVisualizationData& Data)
+            {
+                return Data.TrackIndex == Track.TrackIndex && Data.ChannelIndex == Track.ChannelIndex;
+            });
+            if (IndexOfTrackVis == INDEX_NONE)
+            {
+                IndexOfTrackVis = VisData.TrackVisualizations.IndexOfByPredicate([&Track](const FMidiTrackVisualizationData& Data)
+                {
+                    return Data.TrackIndex == Track.TrackIndex;
+                });
+            }
+            if (IndexOfTrackVis != INDEX_NONE)
+            {
+                PreviewColor = VisData.TrackVisualizations[IndexOfTrackVis].TrackColor;
+            }
+            
+            // Make preview semi-transparent
+            PreviewColor.A = 0.4f;
+            
+            // Calculate preview note duration
+            int32 PreviewDurationTicks = DefaultNoteDurationTicks.Get();
+            if (LinkedSongsMap.IsValid())
+            {
+                PreviewDurationTicks = LinkedSongsMap->SubdivisionToMidiTicks(NoteDuration.Get(), 0);
+            }
+            
+            const float ContentStartY = TimelineHeight;
+            const float RowH = 10.0f * LocalZoom.Y;
+            const float PreviewX = TickToPixel(PreviewNoteTick) - LocalOffset.X;
+            const float PreviewEndX = TickToPixel(PreviewNoteTick + PreviewDurationTicks) - LocalOffset.X;
+            const float PreviewW = FMath::Max(PreviewEndX - PreviewX, 1.0f);
+            const float PreviewY = ContentStartY + (127 - PreviewNoteNumber) * (RowH + 2.0f) - LocalOffset.Y;
+            
+            // Only draw if visible
+            if (PreviewX <= LocalSize.X && PreviewX + PreviewW >= 0.0f && 
+                PreviewY <= LocalSize.Y && PreviewY + RowH >= TimelineHeight)
+            {
+                FSlateDrawElement::MakeBox(
+                    OutDrawElements,
+                    LayerId++,
+                    AllottedGeometry.ToPaintGeometry(FVector2D(PreviewW, RowH), FSlateLayoutTransform(FVector2D(PreviewX, PreviewY))),
+                    NoteBrush,
+                    ESlateDrawEffect::None,
+                    PreviewColor
+                );
+            }
+        }
+    }
+
+    // Layer 6: Paint timeline header (on top of everything)
     LayerId = PaintTimeline(AllottedGeometry, OutDrawElements, LayerId);
  
     return LayerId;
@@ -263,6 +332,19 @@ int32 SMidiPianoroll::OnPaint(const FPaintArgs& Args, const FGeometry& AllottedG
 FReply SMidiPianoroll::OnMouseMove(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent)
 {
     const FVector2D LocalMousePos = MyGeometry.AbsoluteToLocal(MouseEvent.GetScreenSpacePosition());
+    
+    // Update preview note state for paint mode
+    if (bIsEditable && EditMode.Get() == EPianorollEditMode::Paint && !bIsPainting)
+    {
+        LastMousePos = LocalMousePos;
+        PreviewNoteTick = SnapTickToGrid(static_cast<int32>(PixelToTick(LocalMousePos.X)));
+        PreviewNoteNumber = ScreenYToNoteNumber(LocalMousePos.Y, MyGeometry);
+        bShowPreviewNote = (LocalMousePos.Y >= TimelineHeight);
+    }
+    else
+    {
+        bShowPreviewNote = false;
+    }
     
     // Handle note dragging
     if (bIsDraggingNotes && bIsEditable)
@@ -360,10 +442,17 @@ FReply SMidiPianoroll::OnMouseButtonDown(const FGeometry& MyGeometry, const FPoi
             
             if (LinkedMidiData.IsValid() && TargetTrackIndex >= 0 && TargetTrackIndex < LinkedMidiData->Tracks.Num())
             {
+                // Calculate note duration from NoteDuration
+                int32 NoteDurationTicks = DefaultNoteDurationTicks.Get();
+                if (LinkedSongsMap.IsValid())
+                {
+                    NoteDurationTicks = LinkedSongsMap->SubdivisionToMidiTicks(NoteDuration.Get(), 0);
+                }
+                
                 // Create a new note
                 FLinkedMidiNote NewNote;
                 NewNote.NoteOnTick = ClickTick;
-                NewNote.NoteOffTick = ClickTick + DefaultNoteDurationTicks.Get();
+                NewNote.NoteOffTick = ClickTick + NoteDurationTicks;
                 NewNote.NoteNumber = ClickNoteNumber;
                 NewNote.Velocity = DefaultNoteVelocity.Get();
                 
@@ -655,7 +744,8 @@ void SMidiPianoroll::RecalculateGrid(const FGeometry& AllottedGeometry) const
         const FSongMaps& SongsMap = *LinkedSongsMap;
         TicksPerBar = SongsMap.SubdivisionToMidiTicks(EMidiClockSubdivisionQuantization::Bar, 0);
         TicksPerBeat = SongsMap.SubdivisionToMidiTicks(EMidiClockSubdivisionQuantization::Beat, 0);
-        TicksPerSubdivision = TicksPerBeat / 4; // Assuming 16th note subdivisions
+        // Use the configured GridSubdivision for visual grid
+        TicksPerSubdivision = SongsMap.SubdivisionToMidiTicks(GridSubdivision.Get(), 0);
         
         // Get time signature to determine beats per bar
         const FTimeSignature* TimeSig = SongsMap.GetTimeSignatureAtTick(0);
@@ -664,6 +754,9 @@ void SMidiPianoroll::RecalculateGrid(const FGeometry& AllottedGeometry) const
             BeatsPerBar = TimeSig->Numerator;
         }
     }
+    
+    // Calculate how many subdivisions per beat
+    const int32 SubdivisionsPerBeat = (TicksPerSubdivision > 0) ? FMath::Max(1, TicksPerBeat / TicksPerSubdivision) : 4;
     
     // Calculate visible tick range
     const double VisibleStartTick = FMath::Max(0.0, PixelToTick(0.0));
@@ -723,7 +816,7 @@ void SMidiPianoroll::RecalculateGrid(const FGeometry& AllottedGeometry) const
                 for (int32 BeatNum = 1; BeatNum <= BeatsPerBar; ++BeatNum)
                 {
                     const double BeatStartTick = BarTick + (BeatNum - 1) * TicksPerBeat;
-                    for (int32 SubDiv = 2; SubDiv <= 4; ++SubDiv) // 16th notes (4 subdivisions per beat)
+                    for (int32 SubDiv = 2; SubDiv <= SubdivisionsPerBeat; ++SubDiv)
                     {
                         const double SubDivTick = BeatStartTick + (SubDiv - 1) * TicksPerSubdivision;
                         if (SubDivTick <= VisibleEndTick && SubDivTick < BarTick + TicksPerBar)
@@ -1147,22 +1240,8 @@ int32 SMidiPianoroll::SnapTickToGrid(int32 Tick) const
         return FMath::RoundToInt((float)Tick / SnapInterval) * SnapInterval;
     }
     
-    const EPianorollGridPointType CurrentGridType = GridPointType.Get();
-    int32 SnapInterval = 480; // Default to beat
-    
-    switch (CurrentGridType)
-    {
-    case EPianorollGridPointType::Bar:
-        SnapInterval = LinkedSongsMap->SubdivisionToMidiTicks(EMidiClockSubdivisionQuantization::Bar, 0);
-        break;
-    case EPianorollGridPointType::Beat:
-        SnapInterval = LinkedSongsMap->SubdivisionToMidiTicks(EMidiClockSubdivisionQuantization::Beat, 0);
-        break;
-    case EPianorollGridPointType::Subdivision:
-        // Use 16th notes
-        SnapInterval = LinkedSongsMap->SubdivisionToMidiTicks(EMidiClockSubdivisionQuantization::Beat, 0) / 4;
-        break;
-    }
+    // Use NoteSnapping for the snap interval when editing
+    const int32 SnapInterval = LinkedSongsMap->SubdivisionToMidiTicks(NoteSnapping.Get(), 0);
     
     return FMath::RoundToInt((float)Tick / SnapInterval) * SnapInterval;
 }

@@ -71,6 +71,12 @@ public:
 		SLATE_ATTRIBUTE(int32, DefaultNoteVelocity)
 		/** Default duration in ticks for painted notes */
 		SLATE_ATTRIBUTE(int32, DefaultNoteDurationTicks)
+		/** Grid subdivision for snapping (when GridPointType is Subdivision) */
+		SLATE_ATTRIBUTE(EMidiClockSubdivisionQuantization, GridSubdivision)
+		/** Note snapping quantization for editing */
+		SLATE_ATTRIBUTE(EMidiClockSubdivisionQuantization, NoteSnapping)
+		/** Note duration quantization for painted notes */
+		SLATE_ATTRIBUTE(EMidiClockSubdivisionQuantization, NoteDuration)
 		/** Is file editable (support selection, moving notes, etc.) */
 		SLATE_ARGUMENT_DEFAULT(bool, bIsEditable) { false };
 	SLATE_END_ARGS()
@@ -109,6 +115,12 @@ TSlateAttribute<FMidiFileVisualizationData> VisualizationData;
 	TSlateAttribute<int32> DefaultNoteVelocity;
 
 	TSlateAttribute<int32> DefaultNoteDurationTicks;
+
+	TSlateAttribute<EMidiClockSubdivisionQuantization> GridSubdivision;
+
+	TSlateAttribute<EMidiClockSubdivisionQuantization> NoteSnapping;
+
+	TSlateAttribute<EMidiClockSubdivisionQuantization> NoteDuration;
 
 	bool bIsEditable;
 
@@ -168,8 +180,12 @@ int32 DragStartNoteNumber = 0;
 // Painting state
 bool bIsPainting = false;
 
+// Preview note state (for paint mode)
+mutable bool bShowPreviewNote = false;
+mutable int32 PreviewNoteTick = 0;
+mutable int32 PreviewNoteNumber = 0;
+mutable FVector2D LastMousePos = FVector2D::ZeroVector;
 
-	
 // Selected notes identified by track index and note index
 struct FNoteIdentifier
 {

@@ -29,6 +29,7 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "MIDI")
 	EPianorollGridPointType GridPointType = EPianorollGridPointType::Subdivision;
 
+	/** Grid subdivision for visual grid lines (when GridPointType is Subdivision) */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "MIDI")
 	EMidiClockSubdivisionQuantization GridSubdivision = EMidiClockSubdivisionQuantization::SixteenthNote;
 
@@ -44,13 +45,17 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "MIDI|Editing", BlueprintSetter = SetDefaultNoteVelocity, meta = (ClampMin = "1", ClampMax = "127", EditCondition = "IsEditable"))
 	int32 DefaultNoteVelocity = 100;
 
-	/** Default note duration in ticks for painted notes */
+	/** Default note duration in ticks for painted notes (fallback if no song map) */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "MIDI|Editing", BlueprintSetter = SetDefaultNoteDurationTicks, meta = (ClampMin = "1", EditCondition = "IsEditable"))
 	int32 DefaultNoteDurationTicks = 480;
 
+	/** Note snapping quantization for editing (snap note start positions) */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "MIDI|Editing", meta = (EditCondition = "IsEditable"))
+	EMidiClockSubdivisionQuantization NoteSnapping = EMidiClockSubdivisionQuantization::SixteenthNote;
 
-	EMidiClockSubdivisionQuantization NoteGridSubdivision = EMidiClockSubdivisionQuantization::SixteenthNote;
+	/** Note duration quantization for painted notes */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "MIDI|Editing", meta = (EditCondition = "IsEditable"))
+	EMidiClockSubdivisionQuantization NoteDuration = EMidiClockSubdivisionQuantization::SixteenthNote;
 
 	UPROPERTY(EditAnywhere, Category = "Appearance")
 	FMidiPianorollStyle PianorollStyle;
@@ -110,6 +115,12 @@ public:
 	int32 GetDefaultNoteVelocity() const { return DefaultNoteVelocity; }
 
 	int32 GetDefaultNoteDurationTicks() const { return DefaultNoteDurationTicks; }
+
+	EMidiClockSubdivisionQuantization GetGridSubdivision() const { return GridSubdivision; }
+
+	EMidiClockSubdivisionQuantization GetNoteSnapping() const { return NoteSnapping; }
+
+	EMidiClockSubdivisionQuantization GetNoteDuration() const { return NoteDuration; }
 
 	TSharedRef<SWidget> RebuildWidget() override;
 

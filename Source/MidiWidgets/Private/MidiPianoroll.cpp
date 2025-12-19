@@ -180,6 +180,9 @@ TSharedRef<SWidget> UMidiPianoroll::RebuildWidget()
         .EditingTrackIndex(TAttribute<int32>::CreateLambda([this]() { return GetEditingTrackIndex(); }))
         .DefaultNoteVelocity(TAttribute<int32>::CreateLambda([this]() { return GetDefaultNoteVelocity(); }))
         .DefaultNoteDurationTicks(TAttribute<int32>::CreateLambda([this]() { return GetDefaultNoteDurationTicks(); }))
+        .GridSubdivision(TAttribute<EMidiClockSubdivisionQuantization>::CreateLambda([this]() { return GetGridSubdivision(); }))
+        .NoteSnapping(TAttribute<EMidiClockSubdivisionQuantization>::CreateLambda([this]() { return GetNoteSnapping(); }))
+        .NoteDuration(TAttribute<EMidiClockSubdivisionQuantization>::CreateLambda([this]() { return GetNoteDuration(); }))
         .bIsEditable(bIsMutable);
 
     // Bind the delete delegate
