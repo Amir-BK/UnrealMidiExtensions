@@ -21,6 +21,14 @@ enum class EPianorollGridPointType : uint8
 };
 
 UENUM(BlueprintType)
+/** Edit mode for the piano roll */
+enum class EPianorollEditMode : uint8
+{
+	Select UMETA(DisplayName = "Select"),
+	Paint UMETA(DisplayName = "Paint/Draw")
+};
+
+UENUM(BlueprintType)
 enum class EMidiTrackTimeMode : uint8
 {
 	TickLinear UMETA(DisplayName = "Tick Linear"),
