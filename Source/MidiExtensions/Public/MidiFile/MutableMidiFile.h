@@ -28,7 +28,11 @@ class MIDIEXTENSIONS_API UMutableMidiFile : public UMidiFile
 	GENERATED_BODY()
 	
 protected:
-	TSharedPtr<FMidiNotesData, ESPMode::ThreadSafe> LinkedMidiData;
+/** Marker property to ensure proper serialization as MutableMidiFile */
+UPROPERTY()
+bool bIsMutableMidiFile = true;
+
+TSharedPtr<FMidiNotesData, ESPMode::ThreadSafe> LinkedMidiData;
 
 	/** Removes note-on and note-off events from a MIDI track */
 	void RemoveNoteEventsFromTrack(FMidiTrack* Track, const FLinkedMidiNote& Note, int32 Channel);

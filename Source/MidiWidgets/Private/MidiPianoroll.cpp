@@ -10,24 +10,23 @@ void UMidiPianoroll::SetMidiFile(UMidiFile* InMidiFile)
 {
     LinkedMidiFile = InMidiFile;
     
-    // Auto-enable editable mode if the file is a MutableMidiFile
-	//const bool bIsMutable = LinkedMidiFile && ;
-    
     if (PianorollWidget.IsValid())
     {
+        // Clear selection when changing MIDI files
+        PianorollWidget->ClearSelection();
+        
         if (LinkedMidiFile)
         {
             TSharedPtr<FSongMaps, ESPMode::ThreadSafe> SongsMap = MakeShared<FSongMaps, ESPMode::ThreadSafe>(*LinkedMidiFile->GetSongMaps());
 			auto MidiData = FMidiNotesData::BuildFromMidiFile(LinkedMidiFile);
             PianorollWidget->SetMidiData(MidiData, SongsMap);
             VisualizationData = FMidiFileVisualizationData::BuildFromLinkedMidiData(*MidiData);
-            PianorollWidget->SetIsEditable(LinkedMidiFile->IsA<UMutableMidiFile>());
+            // bIsEditable is now a TAttribute that automatically checks IsEditable()
         }
         else
         {
             PianorollWidget->SetMidiData(nullptr, nullptr);
             VisualizationData = FMidiFileVisualizationData();
-            PianorollWidget->SetIsEditable(false);
         }
     }
 }
@@ -155,9 +154,6 @@ TSharedRef<SWidget> UMidiPianoroll::RebuildWidget()
     TSharedPtr<FMidiNotesData, ESPMode::ThreadSafe> MidiData;
     TSharedPtr<FSongMaps, ESPMode::ThreadSafe> SongsMap;
 
-    // Auto-enable editable mode if the file is a MutableMidiFile
-    bool bIsMutable = Cast<UMutableMidiFile>(LinkedMidiFile) != nullptr;
-
     if(LinkedMidiFile)
     {
         MidiData = FMidiNotesData::BuildFromMidiFile(LinkedMidiFile);
@@ -183,7 +179,7 @@ TSharedRef<SWidget> UMidiPianoroll::RebuildWidget()
         .GridSubdivision(TAttribute<EMidiClockSubdivisionQuantization>::CreateLambda([this]() { return GetGridSubdivision(); }))
         .bSnapToGrid(TAttribute<bool>::CreateLambda([this]() { return GetSnapToGrid(); }))
         .NoteDuration(TAttribute<EMidiClockSubdivisionQuantization>::CreateLambda([this]() { return GetNoteDuration(); }))
-        .bIsEditable(bIsMutable);
+        .bIsEditable(TAttribute<bool>::CreateLambda([this]() { return IsEditable(); }));
 
     // Bind the delete delegate
     PianorollWidget->OnDeleteSelectedNotes.BindUObject(this, &UMidiPianoroll::DeleteSelectedNotes);

@@ -78,7 +78,7 @@ public:
 		/** Note duration quantization for painted notes */
 		SLATE_ATTRIBUTE(EMidiClockSubdivisionQuantization, NoteDuration)
 		/** Is file editable (support selection, moving notes, etc.) */
-		SLATE_ARGUMENT_DEFAULT(bool, bIsEditable) { false };
+		SLATE_ATTRIBUTE(bool, bIsEditable)
 	SLATE_END_ARGS()
 
 	SMidiPianoroll();
@@ -122,7 +122,7 @@ TSlateAttribute<FMidiFileVisualizationData> VisualizationData;
 
 	TSlateAttribute<EMidiClockSubdivisionQuantization> NoteDuration;
 
-	bool bIsEditable;
+	TSlateAttribute<bool> bIsEditable;
 
 	/** Height of the timeline header */
 	float TimelineHeight = 25.0f;
@@ -135,12 +135,7 @@ TSlateAttribute<FMidiFileVisualizationData> VisualizationData;
 
 public:
 
-	void SetIsEditable(bool bInIsEditable)
-	{
-		bIsEditable = bInIsEditable;
-	}
-
-	//SWidget interface
+//SWidget interface
     virtual FReply OnMouseMove(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override;
 
 	virtual FReply OnMouseButtonDown(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override;
@@ -176,6 +171,8 @@ bool bIsDraggingNotes = false;
 FVector2D DragStartPos;
 int32 DragStartTick = 0;
 int32 DragStartNoteNumber = 0;
+int32 DragLastAppliedDeltaTicks = 0;
+int32 DragLastAppliedDeltaNotes = 0;
 
 // Painting state
 bool bIsPainting = false;
@@ -211,6 +208,7 @@ return HashCombine(GetTypeHash(Key.TrackIndex), GetTypeHash(Key.NoteIndex));
 };
 	
 TSet<FNoteIdentifier> SelectedNotes;
+TMap<FNoteIdentifier, FLinkedMidiNote> OriginalNotePositions;
 
 	/** Uses the current zoom, the song map, and the time mode to convert a tick to a pixel position */
 	double TickToPixel(double Tick) const;

@@ -48,8 +48,20 @@ void UMutableMidiFile::InitializeFromMidiFile(UMidiFile* SourceFile)
 
 void UMutableMidiFile::ModifyNotes(const TArray<FNotesEditCallbackData>& NotesEdits, FOnNotesEdit OnNotesEditComplete)
 {
-	if (NotesEdits.IsEmpty() || !LinkedMidiData.IsValid())
+	if (NotesEdits.IsEmpty())
 	{
+		return;
+	}
+
+	// Ensure LinkedMidiData is initialized (may be null if asset was loaded from disk)
+	if (!LinkedMidiData.IsValid())
+	{
+		LinkedMidiData = FMidiNotesData::BuildFromMidiFile(this);
+	}
+
+	if (!LinkedMidiData.IsValid())
+	{
+		UE_LOG(LogTemp, Warning, TEXT("ModifyNotes: Failed to build LinkedMidiData"));
 		return;
 	}
 
@@ -288,7 +300,8 @@ UMidiFile* UMutableMidiFile::SaveAsAsset(const FString& PackagePath, const FStri
 	Package->FullyLoad();
 
 	// Create a new UMutableMidiFile to save as the asset (keeping it mutable for future edits)
-	UMutableMidiFile* NewMidiFile = NewObject<UMutableMidiFile>(Package, *AssetName, RF_Public | RF_Standalone);
+	// IMPORTANT: Pass StaticClass() explicitly to ensure proper class serialization
+	UMutableMidiFile* NewMidiFile = NewObject<UMutableMidiFile>(Package, UMutableMidiFile::StaticClass(), FName(*AssetName), RF_Public | RF_Standalone);
 	if (!NewMidiFile)
 	{
 		UE_LOG(LogTemp, Warning, TEXT("SaveAsAsset: Failed to create MIDI file object"));
@@ -313,7 +326,7 @@ UMidiFile* UMutableMidiFile::SaveAsAsset(const FString& PackagePath, const FStri
 	
 	if (SaveResult.Result == ESavePackageResult::Success)
 	{
-		UE_LOG(LogTemp, Log, TEXT("SaveAsAsset: Successfully saved MIDI file to '%s'"), *PackageFilename);
+		UE_LOG(LogTemp, Log, TEXT("SaveAsAsset: Successfully saved MIDI file to '%s' as class %s"), *PackageFilename, *NewMidiFile->GetClass()->GetName());
 		return NewMidiFile;
 	}
 	else

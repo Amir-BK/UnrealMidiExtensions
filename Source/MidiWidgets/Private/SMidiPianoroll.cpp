@@ -35,6 +35,7 @@ void SMidiPianoroll::PrivateRegisterAttributes(FSlateAttributeInitializer& Attri
 	SLATE_ADD_MEMBER_ATTRIBUTE_DEFINITION_WITH_NAME(AttributeInitializer, "GridSubdivision", GridSubdivision, EInvalidateWidgetReason::Paint);
 	SLATE_ADD_MEMBER_ATTRIBUTE_DEFINITION_WITH_NAME(AttributeInitializer, "bSnapToGrid", bSnapToGrid, EInvalidateWidgetReason::None);
 	SLATE_ADD_MEMBER_ATTRIBUTE_DEFINITION_WITH_NAME(AttributeInitializer, "NoteDuration", NoteDuration, EInvalidateWidgetReason::None);
+	SLATE_ADD_MEMBER_ATTRIBUTE_DEFINITION_WITH_NAME(AttributeInitializer, "bIsEditable", bIsEditable, EInvalidateWidgetReason::Paint);
 }
 
 SMidiPianoroll::SMidiPianoroll()
@@ -50,6 +51,7 @@ SMidiPianoroll::SMidiPianoroll()
 	, GridSubdivision(*this, EMidiClockSubdivisionQuantization::SixteenthNote)
 	, bSnapToGrid(*this, true)
 	, NoteDuration(*this, EMidiClockSubdivisionQuantization::SixteenthNote)
+	, bIsEditable(*this, false)
 {
 }
 
@@ -67,7 +69,6 @@ void SMidiPianoroll::Construct(const FArguments& InArgs)
 	LinkedSongsMap = InArgs._LinkedSongsMap;
 	PianorollStyle = InArgs._PianorollStyle ? InArgs._PianorollStyle : &FMidiPianorollStyle::GetDefault();
 	TimelineHeight = InArgs._TimelineHeight;
-	bIsEditable = InArgs._bIsEditable;
 
 	Offset.Assign(*this, InArgs._Offset);
 	Zoom.Assign(*this, InArgs._Zoom);
@@ -81,6 +82,7 @@ void SMidiPianoroll::Construct(const FArguments& InArgs)
 	GridSubdivision.Assign(*this, InArgs._GridSubdivision);
 	bSnapToGrid.Assign(*this, InArgs._bSnapToGrid);
 	NoteDuration.Assign(*this, InArgs._NoteDuration);
+	bIsEditable.Assign(*this, InArgs._bIsEditable);
 
 	ChildSlot
 	[
@@ -265,7 +267,7 @@ int32 SMidiPianoroll::OnPaint(const FPaintArgs& Args, const FGeometry& AllottedG
     }
 
     // Layer 5: Draw preview note when in paint mode
-    if (bShowPreviewNote && bIsEditable && EditMode.Get() == EPianorollEditMode::Paint && LinkedMidiData.IsValid())
+    if (bShowPreviewNote && bIsEditable.Get() && EditMode.Get() == EPianorollEditMode::Paint && LinkedMidiData.IsValid())
     {
         const int32 TargetTrackIndex = EditingTrackIndex.Get();
         if (TargetTrackIndex >= 0 && TargetTrackIndex < LinkedMidiData->Tracks.Num())
@@ -334,7 +336,7 @@ FReply SMidiPianoroll::OnMouseMove(const FGeometry& MyGeometry, const FPointerEv
     const FVector2D LocalMousePos = MyGeometry.AbsoluteToLocal(MouseEvent.GetScreenSpacePosition());
     
     // Update preview note state for paint mode
-    if (bIsEditable && EditMode.Get() == EPianorollEditMode::Paint && !bIsPainting)
+    if (bIsEditable.Get() && EditMode.Get() == EPianorollEditMode::Paint && !bIsPainting)
     {
         LastMousePos = LocalMousePos;
         PreviewNoteTick = SnapTickToGrid(static_cast<int32>(PixelToTick(LocalMousePos.X)));
@@ -347,7 +349,7 @@ FReply SMidiPianoroll::OnMouseMove(const FGeometry& MyGeometry, const FPointerEv
     }
     
     // Handle note resizing
-    if (bIsResizingNotes && bIsEditable)
+    if (bIsResizingNotes && bIsEditable.Get())
     {
         const int32 CurrentTick = SnapTickToGrid(static_cast<int32>(PixelToTick(LocalMousePos.X)));
         const int32 DeltaTicks = CurrentTick - ResizeStartTick;
@@ -406,47 +408,42 @@ FReply SMidiPianoroll::OnMouseMove(const FGeometry& MyGeometry, const FPointerEv
     }
     
     // Handle note dragging
-    if (bIsDraggingNotes && bIsEditable)
+    if (bIsDraggingNotes && bIsEditable.Get())
     {
-        // Calculate the delta in ticks and note numbers
+        // Calculate the delta from the original drag start position
         const int32 CurrentTick = SnapTickToGrid(static_cast<int32>(PixelToTick(LocalMousePos.X)));
         const int32 CurrentNoteNumber = ScreenYToNoteNumber(LocalMousePos.Y, MyGeometry);
         
         const int32 DeltaTicks = CurrentTick - DragStartTick;
         const int32 DeltaNotes = CurrentNoteNumber - DragStartNoteNumber;
         
-        // Only update if there's actual movement
-        if (DeltaTicks != 0 || DeltaNotes != 0)
+        // Only update if the delta has changed from last applied
+        if (DeltaTicks != DragLastAppliedDeltaTicks || DeltaNotes != DragLastAppliedDeltaNotes)
         {
-            // Build edit operations for all selected notes
+            // Build edit operations for all selected notes using ORIGINAL positions
             TArray<FNotesEditCallbackData> Edits;
             
-            for (const FNoteIdentifier& NoteId : SelectedNotes)
+            for (const auto& OriginalNotePair : OriginalNotePositions)
             {
-                if (LinkedMidiData.IsValid() && 
-                    LinkedMidiData->Tracks.IsValidIndex(NoteId.TrackIndex) &&
-                    LinkedMidiData->Tracks[NoteId.TrackIndex].Notes.IsValidIndex(NoteId.NoteIndex))
-                {
-                    const FLinkedMidiNote& OriginalNote = LinkedMidiData->Tracks[NoteId.TrackIndex].Notes[NoteId.NoteIndex];
-                    
-                    FNotesEditCallbackData Edit;
-                    Edit.TrackIndex = NoteId.TrackIndex;
-                    Edit.NoteIndex = NoteId.NoteIndex;
-                    Edit.NoteData = OriginalNote;
-                    Edit.NoteData.NoteOnTick = FMath::Max(0, OriginalNote.NoteOnTick + DeltaTicks);
-                    Edit.NoteData.NoteOffTick = FMath::Max(Edit.NoteData.NoteOnTick + 1, OriginalNote.NoteOffTick + DeltaTicks);
-                    Edit.NoteData.NoteNumber = FMath::Clamp(OriginalNote.NoteNumber + DeltaNotes, 0, 127);
-                    Edit.bDelete = false;
-                    Edits.Add(Edit);
-                }
+                const FNoteIdentifier& NoteId = OriginalNotePair.Key;
+                const FLinkedMidiNote& OriginalNote = OriginalNotePair.Value;
+                
+                FNotesEditCallbackData Edit;
+                Edit.TrackIndex = NoteId.TrackIndex;
+                Edit.NoteIndex = NoteId.NoteIndex;
+                Edit.NoteData = OriginalNote;
+                Edit.NoteData.NoteOnTick = FMath::Max(0, OriginalNote.NoteOnTick + DeltaTicks);
+                Edit.NoteData.NoteOffTick = FMath::Max(Edit.NoteData.NoteOnTick + 1, OriginalNote.NoteOffTick + DeltaTicks);
+                Edit.NoteData.NoteNumber = FMath::Clamp(OriginalNote.NoteNumber + DeltaNotes, 0, 127);
+                Edit.bDelete = false;
+                Edits.Add(Edit);
             }
             
             if (Edits.Num() > 0 && OnNotesModified.IsBound())
             {
                 OnNotesModified.Execute(Edits);
-                // Update drag start to current position for continuous dragging
-                DragStartTick = CurrentTick;
-                DragStartNoteNumber = CurrentNoteNumber;
+                DragLastAppliedDeltaTicks = DeltaTicks;
+                DragLastAppliedDeltaNotes = DeltaNotes;
             }
         }
         
@@ -481,7 +478,7 @@ FReply SMidiPianoroll::OnMouseMove(const FGeometry& MyGeometry, const FPointerEv
     }
     
     // Update hovered resize edge for cursor
-    if (bIsEditable && EditMode.Get() == EPianorollEditMode::Select && !bIsDraggingNotes && !bIsMarqueeSelecting)
+    if (bIsEditable.Get() && EditMode.Get() == EPianorollEditMode::Select && !bIsDraggingNotes && !bIsMarqueeSelecting)
     {
         int32 HoverTrackIdx, HoverNoteIdx;
         HoveredResizeEdge = GetNoteEdgeAtPosition(LocalMousePos, MyGeometry, HoverTrackIdx, HoverNoteIdx);
@@ -495,7 +492,9 @@ FReply SMidiPianoroll::OnMouseMove(const FGeometry& MyGeometry, const FPointerEv
 }
 FReply SMidiPianoroll::OnMouseButtonDown(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent)
 {
-	if (MouseEvent.GetEffectingButton() == EKeys::LeftMouseButton && bIsEditable)
+    const bool bCurrentlyEditable = bIsEditable.Get();
+    
+	if (MouseEvent.GetEffectingButton() == EKeys::LeftMouseButton && bCurrentlyEditable)
     {
         const FVector2D LocalMousePos = MyGeometry.AbsoluteToLocal(MouseEvent.GetScreenSpacePosition());
         const EPianorollEditMode CurrentEditMode = EditMode.Get();
@@ -576,7 +575,9 @@ FReply SMidiPianoroll::OnMouseButtonDown(const FGeometry& MyGeometry, const FPoi
             int32 ClickedTrackIndex = INDEX_NONE;
             int32 ClickedNoteIndex = INDEX_NONE;
             
-            if (FindNoteAtPosition(LocalMousePos, MyGeometry, ClickedTrackIndex, ClickedNoteIndex))
+            const bool bFoundNote = FindNoteAtPosition(LocalMousePos, MyGeometry, ClickedTrackIndex, ClickedNoteIndex);
+            
+            if (bFoundNote)
             {
                 // Clicked on a note
                 FNoteIdentifier ClickedNoteId;
@@ -609,6 +610,21 @@ FReply SMidiPianoroll::OnMouseButtonDown(const FGeometry& MyGeometry, const FPoi
                     DragStartPos = LocalMousePos;
                     DragStartTick = SnapTickToGrid(static_cast<int32>(PixelToTick(LocalMousePos.X)));
                     DragStartNoteNumber = ScreenYToNoteNumber(LocalMousePos.Y, MyGeometry);
+                    DragLastAppliedDeltaTicks = 0;
+                    DragLastAppliedDeltaNotes = 0;
+                    
+                    // Store original note positions for all selected notes
+                    OriginalNotePositions.Empty();
+                    for (const FNoteIdentifier& NoteId : SelectedNotes)
+                    {
+                        if (LinkedMidiData.IsValid() && 
+                            LinkedMidiData->Tracks.IsValidIndex(NoteId.TrackIndex) &&
+                            LinkedMidiData->Tracks[NoteId.TrackIndex].Notes.IsValidIndex(NoteId.NoteIndex))
+                        {
+                            OriginalNotePositions.Add(NoteId, LinkedMidiData->Tracks[NoteId.TrackIndex].Notes[NoteId.NoteIndex]);
+                        }
+                    }
+                    
                     return FReply::Handled().CaptureMouse(SharedThis(this));
                 }
             }
@@ -645,6 +661,9 @@ FReply SMidiPianoroll::OnMouseButtonUp(const FGeometry& MyGeometry, const FPoint
         if (bIsDraggingNotes)
         {
             bIsDraggingNotes = false;
+            OriginalNotePositions.Empty();
+            DragLastAppliedDeltaTicks = 0;
+            DragLastAppliedDeltaNotes = 0;
             return FReply::Handled().ReleaseMouseCapture();
         }
         
@@ -768,13 +787,13 @@ TOptional<EMouseCursor::Type> SMidiPianoroll::GetCursor() const
     }
     
     // Show resize cursor when hovering near note edges
-    if (bIsEditable && HoveredResizeEdge != ENoteResizeEdge::None)
+    if (bIsEditable.Get() && HoveredResizeEdge != ENoteResizeEdge::None)
     {
         return EMouseCursor::ResizeLeftRight;
     }
     
     // Show different cursor based on edit mode
-    if (bIsEditable)
+    if (bIsEditable.Get())
     {
         const EPianorollEditMode CurrentEditMode = EditMode.Get();
         if (CurrentEditMode == EPianorollEditMode::Paint)
@@ -1443,7 +1462,7 @@ SMidiPianoroll::ENoteResizeEdge SMidiPianoroll::GetNoteEdgeAtPosition(const FVec
 
 FReply SMidiPianoroll::OnKeyDown(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent)
 {
-    if (!bIsEditable)
+    if (!bIsEditable.Get())
     {
         return FReply::Unhandled();
     }
