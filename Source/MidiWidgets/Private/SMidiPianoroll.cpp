@@ -33,7 +33,7 @@ void SMidiPianoroll::PrivateRegisterAttributes(FSlateAttributeInitializer& Attri
 	SLATE_ADD_MEMBER_ATTRIBUTE_DEFINITION_WITH_NAME(AttributeInitializer, "DefaultNoteVelocity", DefaultNoteVelocity, EInvalidateWidgetReason::None);
 	SLATE_ADD_MEMBER_ATTRIBUTE_DEFINITION_WITH_NAME(AttributeInitializer, "DefaultNoteDurationTicks", DefaultNoteDurationTicks, EInvalidateWidgetReason::None);
 	SLATE_ADD_MEMBER_ATTRIBUTE_DEFINITION_WITH_NAME(AttributeInitializer, "GridSubdivision", GridSubdivision, EInvalidateWidgetReason::Paint);
-	SLATE_ADD_MEMBER_ATTRIBUTE_DEFINITION_WITH_NAME(AttributeInitializer, "NoteSnapping", NoteSnapping, EInvalidateWidgetReason::None);
+	SLATE_ADD_MEMBER_ATTRIBUTE_DEFINITION_WITH_NAME(AttributeInitializer, "bSnapToGrid", bSnapToGrid, EInvalidateWidgetReason::None);
 	SLATE_ADD_MEMBER_ATTRIBUTE_DEFINITION_WITH_NAME(AttributeInitializer, "NoteDuration", NoteDuration, EInvalidateWidgetReason::None);
 }
 
@@ -48,7 +48,7 @@ SMidiPianoroll::SMidiPianoroll()
 	, DefaultNoteVelocity(*this, 100)
 	, DefaultNoteDurationTicks(*this, 480)
 	, GridSubdivision(*this, EMidiClockSubdivisionQuantization::SixteenthNote)
-	, NoteSnapping(*this, EMidiClockSubdivisionQuantization::SixteenthNote)
+	, bSnapToGrid(*this, true)
 	, NoteDuration(*this, EMidiClockSubdivisionQuantization::SixteenthNote)
 {
 }
@@ -79,7 +79,7 @@ void SMidiPianoroll::Construct(const FArguments& InArgs)
 	DefaultNoteVelocity.Assign(*this, InArgs._DefaultNoteVelocity);
 	DefaultNoteDurationTicks.Assign(*this, InArgs._DefaultNoteDurationTicks);
 	GridSubdivision.Assign(*this, InArgs._GridSubdivision);
-	NoteSnapping.Assign(*this, InArgs._NoteSnapping);
+	bSnapToGrid.Assign(*this, InArgs._bSnapToGrid);
 	NoteDuration.Assign(*this, InArgs._NoteDuration);
 
 	ChildSlot
@@ -346,6 +346,65 @@ FReply SMidiPianoroll::OnMouseMove(const FGeometry& MyGeometry, const FPointerEv
         bShowPreviewNote = false;
     }
     
+    // Handle note resizing
+    if (bIsResizingNotes && bIsEditable)
+    {
+        const int32 CurrentTick = SnapTickToGrid(static_cast<int32>(PixelToTick(LocalMousePos.X)));
+        const int32 DeltaTicks = CurrentTick - ResizeStartTick;
+        
+        if (DeltaTicks != 0)
+        {
+            TArray<FNotesEditCallbackData> Edits;
+            
+            for (const FNoteIdentifier& NoteId : SelectedNotes)
+            {
+                if (LinkedMidiData.IsValid() && 
+                    LinkedMidiData->Tracks.IsValidIndex(NoteId.TrackIndex) &&
+                    LinkedMidiData->Tracks[NoteId.TrackIndex].Notes.IsValidIndex(NoteId.NoteIndex))
+                {
+                    const FLinkedMidiNote& OriginalNote = LinkedMidiData->Tracks[NoteId.TrackIndex].Notes[NoteId.NoteIndex];
+                    
+                    FNotesEditCallbackData Edit;
+                    Edit.TrackIndex = NoteId.TrackIndex;
+                    Edit.NoteIndex = NoteId.NoteIndex;
+                    Edit.NoteData = OriginalNote;
+                    Edit.bDelete = false;
+                    
+                    if (ResizeEdge == ENoteResizeEdge::Left)
+                    {
+                        // Resize from left - change note start
+                        const int32 NewStartTick = FMath::Max(0, OriginalNote.NoteOnTick + DeltaTicks);
+                        // Ensure minimum note length
+                        if (OriginalNote.NoteOffTick - NewStartTick >= MinNoteDurationTicks)
+                        {
+                            Edit.NoteData.NoteOnTick = NewStartTick;
+                        }
+                    }
+                    else if (ResizeEdge == ENoteResizeEdge::Right)
+                    {
+                        // Resize from right - change note end
+                        const int32 NewEndTick = OriginalNote.NoteOffTick + DeltaTicks;
+                        // Ensure minimum note length
+                        if (NewEndTick - OriginalNote.NoteOnTick >= MinNoteDurationTicks)
+                        {
+                            Edit.NoteData.NoteOffTick = NewEndTick;
+                        }
+                    }
+                    
+                    Edits.Add(Edit);
+                }
+            }
+            
+            if (Edits.Num() > 0 && OnNotesModified.IsBound())
+            {
+                OnNotesModified.Execute(Edits);
+                ResizeStartTick = CurrentTick;
+            }
+        }
+        
+        return FReply::Handled();
+    }
+    
     // Handle note dragging
     if (bIsDraggingNotes && bIsEditable)
     {
@@ -420,6 +479,17 @@ FReply SMidiPianoroll::OnMouseMove(const FGeometry& MyGeometry, const FPointerEv
             bIsPanning = false;
         }
     }
+    
+    // Update hovered resize edge for cursor
+    if (bIsEditable && EditMode.Get() == EPianorollEditMode::Select && !bIsDraggingNotes && !bIsMarqueeSelecting)
+    {
+        int32 HoverTrackIdx, HoverNoteIdx;
+        HoveredResizeEdge = GetNoteEdgeAtPosition(LocalMousePos, MyGeometry, HoverTrackIdx, HoverNoteIdx);
+    }
+    else
+    {
+        HoveredResizeEdge = ENoteResizeEdge::None;
+    }
 
     return FReply::Unhandled();
 }
@@ -477,6 +547,31 @@ FReply SMidiPianoroll::OnMouseButtonDown(const FGeometry& MyGeometry, const FPoi
         }
         else // Select mode
         {
+            // First check if we're clicking on a note edge for resizing
+            int32 EdgeTrackIndex = INDEX_NONE;
+            int32 EdgeNoteIndex = INDEX_NONE;
+            const ENoteResizeEdge ClickedEdge = GetNoteEdgeAtPosition(LocalMousePos, MyGeometry, EdgeTrackIndex, EdgeNoteIndex);
+            
+            if (ClickedEdge != ENoteResizeEdge::None)
+            {
+                // Start resizing
+                FNoteIdentifier EdgeNoteId;
+                EdgeNoteId.TrackIndex = EdgeTrackIndex;
+                EdgeNoteId.NoteIndex = EdgeNoteIndex;
+                
+                // If the note under cursor is not selected, select only it
+                if (!SelectedNotes.Contains(EdgeNoteId))
+                {
+                    SelectedNotes.Empty();
+                    SelectedNotes.Add(EdgeNoteId);
+                }
+                
+                bIsResizingNotes = true;
+                ResizeEdge = ClickedEdge;
+                ResizeStartTick = SnapTickToGrid(static_cast<int32>(PixelToTick(LocalMousePos.X)));
+                return FReply::Handled().CaptureMouse(SharedThis(this));
+            }
+            
             // Check if clicking on an existing note
             int32 ClickedTrackIndex = INDEX_NONE;
             int32 ClickedNoteIndex = INDEX_NONE;
@@ -550,6 +645,13 @@ FReply SMidiPianoroll::OnMouseButtonUp(const FGeometry& MyGeometry, const FPoint
         if (bIsDraggingNotes)
         {
             bIsDraggingNotes = false;
+            return FReply::Handled().ReleaseMouseCapture();
+        }
+        
+        if (bIsResizingNotes)
+        {
+            bIsResizingNotes = false;
+            ResizeEdge = ENoteResizeEdge::None;
             return FReply::Handled().ReleaseMouseCapture();
         }
         
@@ -641,6 +743,11 @@ TOptional<EMouseCursor::Type> SMidiPianoroll::GetCursor() const
         return EMouseCursor::GrabHandClosed;
     }
     
+    if (bIsResizingNotes)
+    {
+        return EMouseCursor::ResizeLeftRight;
+    }
+    
     if (bIsMarqueeSelecting)
     {
         return EMouseCursor::Crosshairs;
@@ -658,6 +765,12 @@ TOptional<EMouseCursor::Type> SMidiPianoroll::GetCursor() const
             return EMouseCursor::GrabHandClosed;
         }
 		return EMouseCursor::GrabHand;
+    }
+    
+    // Show resize cursor when hovering near note edges
+    if (bIsEditable && HoveredResizeEdge != ENoteResizeEdge::None)
+    {
+        return EMouseCursor::ResizeLeftRight;
     }
     
     // Show different cursor based on edit mode
@@ -1233,6 +1346,12 @@ bool SMidiPianoroll::FindNoteAtPosition(const FVector2D& ScreenPos, const FGeome
 
 int32 SMidiPianoroll::SnapTickToGrid(int32 Tick) const
 {
+    // If snapping is disabled, return the tick as-is
+    if (!bSnapToGrid.Get())
+    {
+        return Tick;
+    }
+    
     if (!LinkedSongsMap.IsValid())
     {
         // Default snap to 16th notes at 480 PPQ
@@ -1240,10 +1359,86 @@ int32 SMidiPianoroll::SnapTickToGrid(int32 Tick) const
         return FMath::RoundToInt((float)Tick / SnapInterval) * SnapInterval;
     }
     
-    // Use NoteSnapping for the snap interval when editing
-    const int32 SnapInterval = LinkedSongsMap->SubdivisionToMidiTicks(NoteSnapping.Get(), 0);
+    // Use GridSubdivision for the snap interval
+    const int32 SnapInterval = LinkedSongsMap->SubdivisionToMidiTicks(GridSubdivision.Get(), 0);
     
     return FMath::RoundToInt((float)Tick / SnapInterval) * SnapInterval;
+}
+
+SMidiPianoroll::ENoteResizeEdge SMidiPianoroll::GetNoteEdgeAtPosition(const FVector2D& ScreenPos, const FGeometry& AllottedGeometry, int32& OutTrackIndex, int32& OutNoteIndex) const
+{
+    if (!LinkedMidiData.IsValid())
+    {
+        return ENoteResizeEdge::None;
+    }
+    
+    const FVector2D LocalOffset = Offset.Get();
+    const FVector2D LocalZoom = Zoom.Get();
+    const float ContentStartY = TimelineHeight;
+    const float RowH = 10.0f * LocalZoom.Y;
+    
+    // Edge detection threshold in pixels
+    constexpr float EdgeThreshold = 6.0f;
+    
+    const FMidiFileVisualizationData& VisData = VisualizationData.Get();
+    
+    for (int32 TrackIdx = 0; TrackIdx < LinkedMidiData->Tracks.Num(); ++TrackIdx)
+    {
+        const FMidiNotesTrack& Track = LinkedMidiData->Tracks[TrackIdx];
+        
+        // Check track visibility
+        int32 IndexOfTrackVis = VisData.TrackVisualizations.IndexOfByPredicate([&Track](const FMidiTrackVisualizationData& Data)
+        {
+            return Data.TrackIndex == Track.TrackIndex && Data.ChannelIndex == Track.ChannelIndex;
+        });
+        
+        if (IndexOfTrackVis == INDEX_NONE)
+        {
+            IndexOfTrackVis = VisData.TrackVisualizations.IndexOfByPredicate([&Track](const FMidiTrackVisualizationData& Data)
+            {
+                return Data.TrackIndex == Track.TrackIndex;
+            });
+        }
+        
+        const FMidiTrackVisualizationData* Vis = (IndexOfTrackVis != INDEX_NONE) 
+            ? &VisData.TrackVisualizations[IndexOfTrackVis] 
+            : nullptr;
+            
+        if (Vis && !Vis->bIsVisible)
+        {
+            continue;
+        }
+        
+        for (int32 NoteIdx = 0; NoteIdx < Track.Notes.Num(); ++NoteIdx)
+        {
+            const FLinkedMidiNote& Note = Track.Notes[NoteIdx];
+            
+            const float NoteX = TickToPixel(Note.NoteOnTick) - LocalOffset.X;
+            const float NoteEndX = TickToPixel(Note.NoteOffTick) - LocalOffset.X;
+            const float NoteY = ContentStartY + (127 - Note.NoteNumber) * (RowH + 2.0f) - LocalOffset.Y;
+            
+            // Check if within vertical bounds
+            if (ScreenPos.Y >= NoteY && ScreenPos.Y <= NoteY + RowH)
+            {
+                // Check left edge
+                if (FMath::Abs(ScreenPos.X - NoteX) <= EdgeThreshold)
+                {
+                    OutTrackIndex = TrackIdx;
+                    OutNoteIndex = NoteIdx;
+                    return ENoteResizeEdge::Left;
+                }
+                // Check right edge
+                if (FMath::Abs(ScreenPos.X - NoteEndX) <= EdgeThreshold)
+                {
+                    OutTrackIndex = TrackIdx;
+                    OutNoteIndex = NoteIdx;
+                    return ENoteResizeEdge::Right;
+                }
+            }
+        }
+    }
+    
+    return ENoteResizeEdge::None;
 }
 
 FReply SMidiPianoroll::OnKeyDown(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent)

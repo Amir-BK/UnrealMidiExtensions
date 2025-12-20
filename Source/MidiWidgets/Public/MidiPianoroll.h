@@ -49,9 +49,9 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "MIDI|Editing", BlueprintSetter = SetDefaultNoteDurationTicks, meta = (ClampMin = "1", EditCondition = "IsEditable"))
 	int32 DefaultNoteDurationTicks = 480;
 
-	/** Note snapping quantization for editing (snap note start positions) */
+	/** Whether to snap notes to the grid when editing */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "MIDI|Editing", meta = (EditCondition = "IsEditable"))
-	EMidiClockSubdivisionQuantization NoteSnapping = EMidiClockSubdivisionQuantization::SixteenthNote;
+	bool bSnapToGrid = true;
 
 	/** Note duration quantization for painted notes */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "MIDI|Editing", meta = (EditCondition = "IsEditable"))
@@ -118,7 +118,7 @@ public:
 
 	EMidiClockSubdivisionQuantization GetGridSubdivision() const { return GridSubdivision; }
 
-	EMidiClockSubdivisionQuantization GetNoteSnapping() const { return NoteSnapping; }
+	bool GetSnapToGrid() const { return bSnapToGrid; }
 
 	EMidiClockSubdivisionQuantization GetNoteDuration() const { return NoteDuration; }
 

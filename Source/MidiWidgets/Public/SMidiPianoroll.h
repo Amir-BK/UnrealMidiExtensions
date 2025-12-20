@@ -73,8 +73,8 @@ public:
 		SLATE_ATTRIBUTE(int32, DefaultNoteDurationTicks)
 		/** Grid subdivision for snapping (when GridPointType is Subdivision) */
 		SLATE_ATTRIBUTE(EMidiClockSubdivisionQuantization, GridSubdivision)
-		/** Note snapping quantization for editing */
-		SLATE_ATTRIBUTE(EMidiClockSubdivisionQuantization, NoteSnapping)
+		/** Whether to snap notes to grid when editing */
+		SLATE_ATTRIBUTE(bool, bSnapToGrid)
 		/** Note duration quantization for painted notes */
 		SLATE_ATTRIBUTE(EMidiClockSubdivisionQuantization, NoteDuration)
 		/** Is file editable (support selection, moving notes, etc.) */
@@ -118,7 +118,7 @@ TSlateAttribute<FMidiFileVisualizationData> VisualizationData;
 
 	TSlateAttribute<EMidiClockSubdivisionQuantization> GridSubdivision;
 
-	TSlateAttribute<EMidiClockSubdivisionQuantization> NoteSnapping;
+	TSlateAttribute<bool> bSnapToGrid;
 
 	TSlateAttribute<EMidiClockSubdivisionQuantization> NoteDuration;
 
@@ -179,6 +179,13 @@ int32 DragStartNoteNumber = 0;
 
 // Painting state
 bool bIsPainting = false;
+
+// Note resizing state
+enum class ENoteResizeEdge : uint8 { None, Left, Right };
+bool bIsResizingNotes = false;
+ENoteResizeEdge ResizeEdge = ENoteResizeEdge::None;
+int32 ResizeStartTick = 0;
+mutable ENoteResizeEdge HoveredResizeEdge = ENoteResizeEdge::None;
 
 // Preview note state (for paint mode)
 mutable bool bShowPreviewNote = false;
@@ -249,6 +256,12 @@ TSet<FNoteIdentifier> SelectedNotes;
 
 	/** Snaps a tick to the nearest grid point */
 	int32 SnapTickToGrid(int32 Tick) const;
+
+	/** Checks if the mouse is near a note edge for resizing */
+	ENoteResizeEdge GetNoteEdgeAtPosition(const FVector2D& ScreenPos, const FGeometry& AllottedGeometry, int32& OutTrackIndex, int32& OutNoteIndex) const;
+
+	/** Minimum note duration in ticks */
+	static constexpr int32 MinNoteDurationTicks = 60;
 
 public:
 	/** Gets the current selected notes */

@@ -11,7 +11,7 @@ void UMidiPianoroll::SetMidiFile(UMidiFile* InMidiFile)
     LinkedMidiFile = InMidiFile;
     
     // Auto-enable editable mode if the file is a MutableMidiFile
-	const bool bIsMutable = LinkedMidiFile->IsA<UMutableMidiFile>();
+	//const bool bIsMutable = LinkedMidiFile && ;
     
     if (PianorollWidget.IsValid())
     {
@@ -21,7 +21,7 @@ void UMidiPianoroll::SetMidiFile(UMidiFile* InMidiFile)
 			auto MidiData = FMidiNotesData::BuildFromMidiFile(LinkedMidiFile);
             PianorollWidget->SetMidiData(MidiData, SongsMap);
             VisualizationData = FMidiFileVisualizationData::BuildFromLinkedMidiData(*MidiData);
-            PianorollWidget->SetIsEditable(bIsMutable);
+            PianorollWidget->SetIsEditable(LinkedMidiFile->IsA<UMutableMidiFile>());
         }
         else
         {
@@ -181,7 +181,7 @@ TSharedRef<SWidget> UMidiPianoroll::RebuildWidget()
         .DefaultNoteVelocity(TAttribute<int32>::CreateLambda([this]() { return GetDefaultNoteVelocity(); }))
         .DefaultNoteDurationTicks(TAttribute<int32>::CreateLambda([this]() { return GetDefaultNoteDurationTicks(); }))
         .GridSubdivision(TAttribute<EMidiClockSubdivisionQuantization>::CreateLambda([this]() { return GetGridSubdivision(); }))
-        .NoteSnapping(TAttribute<EMidiClockSubdivisionQuantization>::CreateLambda([this]() { return GetNoteSnapping(); }))
+        .bSnapToGrid(TAttribute<bool>::CreateLambda([this]() { return GetSnapToGrid(); }))
         .NoteDuration(TAttribute<EMidiClockSubdivisionQuantization>::CreateLambda([this]() { return GetNoteDuration(); }))
         .bIsEditable(bIsMutable);
 
